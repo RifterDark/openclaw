@@ -16,6 +16,7 @@ type MonitorCliOptions = {
   decaySide?: DecaySide;
   refreshMs?: string;
   width?: string;
+  hideCursor?: boolean;
 };
 
 type ParsedMonitorOptions = {
@@ -28,6 +29,7 @@ type ParsedMonitorOptions = {
   decaySide: DecaySide;
   refreshMs: number;
   width: number | "auto";
+  hideCursor: boolean;
 };
 
 type FileState = {
@@ -39,6 +41,8 @@ type FileState = {
 const COMBINING_MARK_RE = /\p{Mark}/u;
 const EXTENDED_PICTOGRAPHIC_RE = /\p{Extended_Pictographic}/u;
 const DEFAULT_TERMINAL_WIDTH = 120;
+const ANSI_HIDE_CURSOR = "\u001b[?25l";
+const ANSI_SHOW_CURSOR = "\u001b[?25h";
 
 export class LogGrowthWatcher {
   private readonly states = new Map<string, FileState>();
@@ -163,6 +167,7 @@ export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOption
     decaySide,
     refreshMs,
     width,
+    hideCursor: raw.hideCursor !== false,
   };
 }
 
@@ -334,8 +339,13 @@ export async function runMonitorCommand(options: ParsedMonitorOptions): Promise<
   let lastActivityMs = Date.now();
   let previousWidth = 0;
   const signalController = createSignalController();
+  const shouldHideCursor = options.hideCursor && Boolean(process.stdout.isTTY);
 
   try {
+    if (shouldHideCursor) {
+      process.stdout.write(ANSI_HIDE_CURSOR);
+    }
+
     while (!signalController.signal.aborted) {
       const now = Date.now();
       if (watcher.scanForGrowth()) {
@@ -360,6 +370,9 @@ export async function runMonitorCommand(options: ParsedMonitorOptions): Promise<
     }
   } finally {
     signalController.dispose();
+    if (shouldHideCursor) {
+      process.stdout.write(ANSI_SHOW_CURSOR);
+    }
     process.stdout.write("\n");
   }
 }
@@ -381,6 +394,7 @@ export function registerMonitorCli(program: Command) {
     )
     .option("--refresh-ms <ms>", "Redraw interval in milliseconds", "250")
     .option("--width <columns|auto>", "Monitor width in columns, or auto", "auto")
+    .option("--no-hide-cursor", "Keep the cursor visible while monitoring")
     .addHelpText(
       "after",
       () =>

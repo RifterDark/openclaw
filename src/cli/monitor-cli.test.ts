@@ -35,9 +35,15 @@ describe("formatElapsed", () => {
 });
 
 describe("parseMonitorOptions", () => {
-  it("defaults decay side to left", () => {
+  it("defaults decay side to left and hides cursor", () => {
     const parsed = parseMonitorOptions({});
     expect(parsed.decaySide).toBe("left");
+    expect(parsed.hideCursor).toBe(true);
+  });
+
+  it("supports --no-hide-cursor", () => {
+    const parsed = parseMonitorOptions({ hideCursor: false });
+    expect(parsed.hideCursor).toBe(false);
   });
 
   it("rejects invalid thresholds", () => {

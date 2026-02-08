@@ -41,9 +41,11 @@ openclaw monitor --decay-side right
 - `--decay-side <left|right>`: which side empties during decay (default: `left`)
 - `--refresh-ms <ms>`: redraw interval in milliseconds (default: `250`)
 - `--width <columns|auto>`: fixed width or terminal auto-detect (default: `auto`)
+- `--no-hide-cursor`: keep the cursor visible while monitoring (default behavior hides it)
 
 ## Notes
 
 - The status line is redrawn in place (no scrolling history).
 - Existing bytes at startup are ignored; only new growth counts as activity.
+- Cursor is hidden while running and restored on exit (use `--no-hide-cursor` to disable).
 - If logs rotate or truncate, monitoring continues automatically.
