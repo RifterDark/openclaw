@@ -72,6 +72,7 @@ const DEFAULT_TERMINAL_WIDTH = 120;
 const ANSI_HIDE_CURSOR = "\u001b[?25l";
 const ANSI_SHOW_CURSOR = "\u001b[?25h";
 const ANSI_CLEAR_LINE_PREFIX = "\r\u001b[2K";
+const ANSI_CLEAR_SCREEN = "\u001b[2J\u001b[H";
 const WARP_CRITICAL_FALLBACK_SYMBOL = "██";
 
 const LOBSTER_RED_PNG_B64 =
@@ -643,14 +644,46 @@ function isAbortError(error: unknown): boolean {
 
 function createSignalController() {
   const controller = new AbortController();
+  let needsFullClear = false;
+
   const stop = () => controller.abort();
+  const markNeedsClear = () => {
+    needsFullClear = true;
+  };
+  const handleStdinData = (chunk: Buffer | string) => {
+    const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+    if (text.includes("\n") || text.includes("\r")) {
+      needsFullClear = true;
+    }
+  };
+
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
+  process.on("SIGWINCH", markNeedsClear);
+
+  const stdinIsTty = Boolean(process.stdin.isTTY);
+  if (stdinIsTty) {
+    process.stdin.on("data", handleStdinData);
+    process.stdin.resume();
+  }
+
   return {
     signal: controller.signal,
+    consumeNeedsFullClear: () => {
+      if (!needsFullClear) {
+        return false;
+      }
+      needsFullClear = false;
+      return true;
+    },
     dispose: () => {
       process.off("SIGINT", stop);
       process.off("SIGTERM", stop);
+      process.off("SIGWINCH", markNeedsClear);
+      if (stdinIsTty) {
+        process.stdin.off("data", handleStdinData);
+        process.stdin.pause();
+      }
     },
   };
 }
@@ -677,6 +710,11 @@ export async function runMonitorCommand(options: ParsedMonitorOptions): Promise<
       const now = Date.now();
       if (watcher.scanForGrowth()) {
         lastActivityMs = now;
+      }
+
+      if (signalController.consumeNeedsFullClear()) {
+        process.stdout.write(ANSI_CLEAR_SCREEN);
+        previousWidth = 0;
       }
 
       const totalColumns = resolveWidth(options.width);
