@@ -62,6 +62,6 @@ openclaw monitor --lobster-style image --terminal-profile iterm2
 - Cursor is hidden while running and restored on exit (use `--no-hide-cursor` to disable).
 - `--width auto` tracks terminal width live; resizing applies on the next redraw tick.
 - Warp uses a clear-line redraw strategy to reduce artifacts when symbols change width.
-- `--lobster-style image` uses embedded recolored lobster PNGs (derived from the macOS lobster glyph) via iTerm2's inline image protocol.
+- `--lobster-style image` uses embedded recolored lobster PNGs (derived from the macOS lobster glyph, with yellow/white tones matched to `🟨` and `⬜`) via iTerm2's inline image protocol.
 - If image mode is requested on non-iTerm2 terminals, monitor falls back to text symbols.
 - If logs rotate or truncate, monitoring continues automatically.
