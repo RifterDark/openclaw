@@ -65,6 +65,7 @@ const DEFAULT_TERMINAL_WIDTH = 120;
 const ANSI_HIDE_CURSOR = "\u001b[?25l";
 const ANSI_SHOW_CURSOR = "\u001b[?25h";
 const ANSI_CLEAR_LINE_PREFIX = "\r\u001b[2K";
+const WARP_CRITICAL_FALLBACK_SYMBOL = "██";
 
 const LOBSTER_RED_PNG_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAACxklEQVR42p1TS0hUURj+zrlnZu7cGR8zOY6Kj3JcSA8ojIiCzFYSLUQRWrQrJKFNCwlqoS2ihVCbwlqE4CbQaFnRyhYpYQUZKoFOOU6+ptGZufO4j3PPaeGMSNamb3E4nPP9H///8f3AHkiAFK8E/4D844/ufVxsr4/MXAjfelCl1ZSEBouc4XC4+mNHaGD+bPjw3hpakgUAWs6Gaxu91+sZ63va1+YCIIcAKaWkraq8VtuoXfUFPA/31jAJEEIgH6Gphiq0g/rgY5ScMmIhOhaG77EAOTI5ZAiIE45KIsRDG0bRdJCQ5R+DAGW7w4R8KBTyTr1DmcfLzOrMbJcRCh31A2Tt9shcQNN4DVFYNGPm7QpKkC52TQApAXIjMb+uJ6zJxFweJqPLz8zKadvt6S+A3BxLq19shUY3FkxkN42pvnTsOwDcBQQFgImiF/Ft48kKUdDc4q67n3Wae05qgcvnKrQBk7dE2pzaDekgnsiNAMA4oAA7B5kAxKvOYHnA7wkaBWm5LbtDL1gXI23+oMunkOi8fkZ1REMqZ7/UqryfuqtJtnvNykmA0KKZyMZkJc+a7Qx2XSxpfDCF9DEXpbAFCo5Uo6vGZ8ZoWJr8PDcQAoAhgNCSh1w3uGUIvWBLQ9Vcfup2L3NLgucFBHXHVT/zGbawLUtkuUHtooCkpVipDjP1vLOY23beR9e2+g9oZaM8zWGnHHiZ68XXZPKKvs2n9LwzS907AqUgSQDgq3qqN6q/ThMxnWDQTUeN5RIWMkkbpnTF3hyCbjAy07OUeSsWUvFi3uXuCL2AAACqYGstDv1XQCOJFcvZXDeRKisTk5NwhEusEkCWuPuWZhxQ5gBvd+exSq+wZzPxVCBnC1QEy7NcwfHnS4vrl1phdrwD/6uABAgB5NTpeq+f0zsrutlk2QIRv+dn1Czc6/qW1Esc/Cf2rflv8uJODwQPp30AAAAASUVORK5CYII=";
@@ -480,6 +481,16 @@ function pickStateSymbol(
   if (runtime?.lobsterStyle === "image" && runtime.imageSymbols) {
     return runtime.imageSymbols[state];
   }
+
+  if (
+    runtime?.profile === "warp" &&
+    runtime.lobsterStyle !== "image" &&
+    state === "critical" &&
+    options.criticalEmoji === "⬜"
+  ) {
+    return WARP_CRITICAL_FALLBACK_SYMBOL;
+  }
+
   if (state === "ok") {
     return options.okEmoji;
   }

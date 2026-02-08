@@ -154,6 +154,36 @@ describe("renderMonitorLine", () => {
     expect(line).toBe("[00:10] CCCCCCCCCCCC");
   });
 
+  it("uses a solid critical fallback symbol on Warp when default white square is active", () => {
+    const options = parseMonitorOptions({
+      warnSeconds: "5",
+      criticalSeconds: "10",
+      width: "24",
+      terminalProfile: "warp",
+      criticalEmoji: "⬜",
+    });
+    const runtime = resolveRuntimeTerminalConfig(options, { TERM_PROGRAM: "WarpTerminal" });
+    const line = renderMonitorLine(options, 10_000, 24, runtime);
+
+    expect(line).toContain("██");
+    expect(line).not.toContain("⬜");
+  });
+
+  it("respects custom critical emoji on Warp", () => {
+    const options = parseMonitorOptions({
+      warnSeconds: "5",
+      criticalSeconds: "10",
+      width: "24",
+      terminalProfile: "warp",
+      criticalEmoji: "X",
+    });
+    const runtime = resolveRuntimeTerminalConfig(options, { TERM_PROGRAM: "WarpTerminal" });
+    const line = renderMonitorLine(options, 10_000, 24, runtime);
+
+    expect(line).toContain("X");
+    expect(line).not.toContain("██");
+  });
+
   it("renders iTerm2 inline image sequences when image mode is active", () => {
     const options = parseMonitorOptions({
       warnSeconds: "5",
