@@ -56,7 +56,7 @@ type RuntimeTerminalConfig = {
   symbolWidth: SymbolWidth;
   supportsCursorHide: boolean;
   lobsterStyle: LobsterStyle;
-  imageSymbols: Record<"warn" | "critical", string> | null;
+  imageSymbols: Record<"ok" | "warn" | "critical", string> | null;
 };
 
 const COMBINING_MARK_RE = /\p{Mark}/u;
@@ -65,6 +65,9 @@ const DEFAULT_TERMINAL_WIDTH = 120;
 const ANSI_HIDE_CURSOR = "\u001b[?25l";
 const ANSI_SHOW_CURSOR = "\u001b[?25h";
 const ANSI_CLEAR_LINE_PREFIX = "\r\u001b[2K";
+
+const LOBSTER_RED_PNG_B64 =
+  "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAACxklEQVR42p1TS0hUURj+zrlnZu7cGR8zOY6Kj3JcSA8ojIiCzFYSLUQRWrQrJKFNCwlqoS2ihVCbwlqE4CbQaFnRyhYpYQUZKoFOOU6+ptGZufO4j3PPaeGMSNamb3E4nPP9H///8f3AHkiAFK8E/4D844/ufVxsr4/MXAjfelCl1ZSEBouc4XC4+mNHaGD+bPjw3hpakgUAWs6Gaxu91+sZ63va1+YCIIcAKaWkraq8VtuoXfUFPA/31jAJEEIgH6Gphiq0g/rgY5ScMmIhOhaG77EAOTI5ZAiIE45KIsRDG0bRdJCQ5R+DAGW7w4R8KBTyTr1DmcfLzOrMbJcRCh31A2Tt9shcQNN4DVFYNGPm7QpKkC52TQApAXIjMb+uJ6zJxFweJqPLz8zKadvt6S+A3BxLq19shUY3FkxkN42pvnTsOwDcBQQFgImiF/Ft48kKUdDc4q67n3Wae05qgcvnKrQBk7dE2pzaDekgnsiNAMA4oAA7B5kAxKvOYHnA7wkaBWm5LbtDL1gXI23+oMunkOi8fkZ1REMqZ7/UqryfuqtJtnvNykmA0KKZyMZkJc+a7Qx2XSxpfDCF9DEXpbAFCo5Uo6vGZ8ZoWJr8PDcQAoAhgNCSh1w3uGUIvWBLQ9Vcfup2L3NLgucFBHXHVT/zGbawLUtkuUHtooCkpVipDjP1vLOY23beR9e2+g9oZaM8zWGnHHiZ68XXZPKKvs2n9LwzS907AqUgSQDgq3qqN6q/ThMxnWDQTUeN5RIWMkkbpnTF3hyCbjAy07OUeSsWUvFi3uXuCL2AAACqYGstDv1XQCOJFcvZXDeRKisTk5NwhEusEkCWuPuWZhxQ5gBvd+exSq+wZzPxVCBnC1QEy7NcwfHnS4vrl1phdrwD/6uABAgB5NTpeq+f0zsrutlk2QIRv+dn1Czc6/qW1Esc/Cf2rflv8uJODwQPp30AAAAASUVORK5CYII=";
 
 const LOBSTER_YELLOW_PNG_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAACeklEQVR42oWTS0hUYRTHf9+9d5xxZnziGx+RMxCDgraQQYi0lUgLaRmt7EG2a9m6VbQIQipo0T7ChRRFVCSRGqWWVBP4SMdHo07jzNx53Xtn7m3hzKQZdTYfnPP9/pxz/hw4GOKP929xoCbvT964jGfQz0Uzw9LyFol8XgKsgW7qRs5wpa+L6MtZdgqMBGBZFgA1ldxsrueyt41L14exAdZe2ZJ87VxobuB8Yw239jMKIIQQVq+XBkWm32HHVWKjZyuMNNCNSzcQ6y9OZ4SgW1FoV2y0nDjGESHECiAphVnK3ZBMk2usQ3HY0XIKQ95WOgBx+/6TL/YSsmUulPAuqQr37z1I+TbFszlCUZXXwU3QDVY/LzIly4xYFlc/fuOTabK8ugGRGJOPP/A9z5sSgN+zt4u1H9yLJ6G9haaeTo6e8lM12IfzuA+Pz0OjmoKNEHfzjFxwQaxHMK+dpby2muq0hi4J+jM6gz4v1Q47YilIryRoiSUYc5Yy09FKYmyKJCCkwizhCJUZjZOyRFMozDsji0uWkbI5MAwcayFmbQr1QtBnWtQW7C8KxJNkjSyqppNx2HHLEquGAZoGpsV6qR2XpmNoOolUBiOPWUUBI4umJliMJ3g7F2DE5eRBOgOpNNgUHs185VxMZTKuMi9EUaDoAps7REfHeaqmmNINVN0gGI1DVIWMRtDtRE2leT86zvPAMuuHOphexAQwTSILa6iA2AqT247s2fXwjZUTgk3AKvw9dBh+D3IsSenwEJUVZcz/jFKlG1DmIqEm6Xo1TajTizY6TrbAKPsF8sqJ8C45AXdiKm1GFpwONhZW2J4IkJwI/PNS/xuH4F+GDw6HHMcAsAAAAABJRU5ErkJggg==";
@@ -298,8 +301,9 @@ function buildIterm2InlineImageSequence(
   return `\u001b]1337;File=name=${nameB64};width=${widthCells};height=${heightCells};inline=1;preserveAspectRatio=1:${pngBase64}\u0007`;
 }
 
-function buildIterm2LobsterSymbols(): Record<"warn" | "critical", string> {
+function buildIterm2LobsterSymbols(): Record<"ok" | "warn" | "critical", string> {
   return {
+    ok: buildIterm2InlineImageSequence(LOBSTER_RED_PNG_B64, { name: "lobster-ok" }),
     warn: buildIterm2InlineImageSequence(LOBSTER_YELLOW_PNG_B64, { name: "lobster-warn" }),
     critical: buildIterm2InlineImageSequence(LOBSTER_WHITE_PNG_B64, {
       name: "lobster-critical",
@@ -473,7 +477,7 @@ function pickStateSymbol(
   runtime: RuntimeTerminalConfig | undefined,
   state: "ok" | "warn" | "critical",
 ): string {
-  if (runtime?.lobsterStyle === "image" && runtime.imageSymbols && state !== "ok") {
+  if (runtime?.lobsterStyle === "image" && runtime.imageSymbols) {
     return runtime.imageSymbols[state];
   }
   if (state === "ok") {
