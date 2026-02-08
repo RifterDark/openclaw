@@ -74,7 +74,7 @@ const DEFAULT_TERMINAL_WIDTH = 120;
 const ANSI_HIDE_CURSOR = "\u001b[?25l";
 const ANSI_SHOW_CURSOR = "\u001b[?25h";
 const ANSI_CLEAR_LINE_PREFIX = "\r\u001b[2K";
-const ANSI_CLEAR_SCREEN = "\u001b[2J\u001b[H";
+const ANSI_CLEAR_TO_START = "\u001b[3J\u001b[H\u001b[2J";
 const WARP_CRITICAL_FALLBACK_SYMBOL = "██";
 
 const LOBSTER_RED_PNG_B64 =
@@ -721,7 +721,7 @@ export async function runMonitorCommand(options: ParsedMonitorOptions): Promise<
       }
 
       if (signalController.consumeNeedsFullClear()) {
-        process.stdout.write(ANSI_CLEAR_SCREEN);
+        process.stdout.write(ANSI_CLEAR_TO_START);
         previousWidth = 0;
       }
 
@@ -772,7 +772,7 @@ export function registerMonitorCli(program: Command) {
     .option("--no-hide-cursor", "Keep the cursor visible while monitoring")
     .option(
       "--no-clear-on-events",
-      "Disable full-screen clear/redraw on terminal resize or Enter",
+      "Disable clear-to-start redraw on terminal resize or Enter",
     )
     .addOption(
       new Option(
