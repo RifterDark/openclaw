@@ -55,12 +55,18 @@ describe("parseMonitorOptions", () => {
     expect(parsed.hideCursor).toBe(true);
     expect(parsed.terminalProfile).toBe("auto");
     expect(parsed.emojiWidth).toBe("auto");
+    expect(parsed.lobsterStyle).toBe("auto");
   });
 
   it("supports --no-hide-cursor and width overrides", () => {
-    const parsed = parseMonitorOptions({ hideCursor: false, emojiWidth: "2" });
+    const parsed = parseMonitorOptions({
+      hideCursor: false,
+      emojiWidth: "2",
+      lobsterStyle: "text",
+    });
     expect(parsed.hideCursor).toBe(false);
     expect(parsed.emojiWidth).toBe(2);
+    expect(parsed.lobsterStyle).toBe("text");
   });
 
   it("rejects invalid thresholds", () => {
@@ -80,13 +86,24 @@ describe("resolveRuntimeTerminalConfig", () => {
     expect(cfg.profile).toBe("warp");
     expect(cfg.drawPrefix).toContain("[2K");
     expect(cfg.symbolWidth).toBe(2);
+    expect(cfg.lobsterStyle).toBe("text");
   });
 
-  it("honors explicit terminal profile over env", () => {
-    const parsed = parseMonitorOptions({ terminalProfile: "generic", emojiWidth: "1" });
+  it("auto-enables image lobsters for iTerm2", () => {
+    const parsed = parseMonitorOptions({});
+    const cfg = resolveRuntimeTerminalConfig(parsed, { TERM_PROGRAM: "iTerm.app" });
+    expect(cfg.profile).toBe("iterm2");
+    expect(cfg.lobsterStyle).toBe("image");
+    expect(cfg.imageSymbols?.ok).toContain("1337;File=");
+    expect(cfg.symbolWidth).toBe(2);
+  });
+
+  it("falls back to text when image style is requested on unsupported terminals", () => {
+    const parsed = parseMonitorOptions({ lobsterStyle: "image", terminalProfile: "generic" });
     const cfg = resolveRuntimeTerminalConfig(parsed, { TERM_PROGRAM: "WarpTerminal" });
     expect(cfg.profile).toBe("generic");
-    expect(cfg.symbolWidth).toBe(1);
+    expect(cfg.lobsterStyle).toBe("text");
+    expect(cfg.imageSymbols).toBeNull();
   });
 });
 
@@ -133,6 +150,21 @@ describe("renderMonitorLine", () => {
 
     const line = renderMonitorLine(options, 10_000, 20);
     expect(line).toBe("[00:10] CCCCCCCCCCCC");
+  });
+
+  it("renders iTerm2 inline image sequences when image mode is active", () => {
+    const options = parseMonitorOptions({
+      warnSeconds: "5",
+      criticalSeconds: "10",
+      width: "20",
+      lobsterStyle: "image",
+      terminalProfile: "iterm2",
+    });
+    const runtime = resolveRuntimeTerminalConfig(options, { TERM_PROGRAM: "iTerm.app" });
+    const line = renderMonitorLine(options, 5_000, 20, runtime);
+
+    expect(line.startsWith("[00:05] ")).toBe(true);
+    expect(line).toContain("1337;File=");
   });
 });
 

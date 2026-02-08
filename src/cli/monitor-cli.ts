@@ -9,6 +9,8 @@ type TerminalProfileOption = "auto" | "apple-terminal" | "iterm2" | "warp" | "ge
 type TerminalProfile = Exclude<TerminalProfileOption, "auto">;
 type DrawStrategy = "carriage" | "clear-line";
 type SymbolWidth = number | "auto";
+type LobsterStyleOption = "auto" | "text" | "image";
+type LobsterStyle = Exclude<LobsterStyleOption, "auto">;
 
 type MonitorCliOptions = {
   logs?: string;
@@ -23,6 +25,7 @@ type MonitorCliOptions = {
   hideCursor?: boolean;
   terminalProfile?: TerminalProfileOption;
   emojiWidth?: string;
+  lobsterStyle?: LobsterStyleOption;
 };
 
 type ParsedMonitorOptions = {
@@ -38,6 +41,7 @@ type ParsedMonitorOptions = {
   hideCursor: boolean;
   terminalProfile: TerminalProfileOption;
   emojiWidth: SymbolWidth;
+  lobsterStyle: LobsterStyleOption;
 };
 
 type FileState = {
@@ -51,6 +55,8 @@ type RuntimeTerminalConfig = {
   drawPrefix: string;
   symbolWidth: SymbolWidth;
   supportsCursorHide: boolean;
+  lobsterStyle: LobsterStyle;
+  imageSymbols: Record<"ok" | "warn" | "critical", string> | null;
 };
 
 const COMBINING_MARK_RE = /\p{Mark}/u;
@@ -60,7 +66,17 @@ const ANSI_HIDE_CURSOR = "\u001b[?25l";
 const ANSI_SHOW_CURSOR = "\u001b[?25h";
 const ANSI_CLEAR_LINE_PREFIX = "\r\u001b[2K";
 
+const LOBSTER_RED_PNG_B64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAAACXBIWXMAAAsTAAALEwEAmpwYAAAB40lEQVR42mNgAIJ72o769/RdS7eL62vvFddL2iRpzAUS3y9mGLOVW133rq5Lyh0dp0AGGHig6zzjkZ7rnm0i2sl7JQ0qd0npOm+X0rEEas7dKqiZcV/XaeZDXZdjcA0vbEJXPDX3+39Jzvz/WQnj/ksi+t6XhPWjT0sa5lyQNft/18D1x3OrwKv/GRhYwRru2QSn/vNN/f9Qx+XTAiEtszplo+Z6JeNZCYJSsjfV7K7+9037/9g5YjLchv0MDCyPbELKLqrbr90mYZA5R9vm+Vwdm3+bFEzzzipazH9gEzjhmpSpMFgx0BpGEH1QXE9xNbeywy11+wWf9Nz/v9F1BdrodHSTgIb9HhENI5CaegYGJriGQ3IGWjtFdDuuajr2PLEJ+v/cNvj/TUOPpbuEdZr3Sht7wQ3/D9IFBLskDLz2Suhv3ith8P64kuX/k8rW//ZLGv0AhtSRvWL6qVDXM0KsAYI9QgZa+yT0Z+8VM7i5hU/9/2Ze9f+7hHWfA4N5zW5RPQ+oDUxwj4M07hbXL90nblg+gUn+aC+T3JutQjo5+yUMOg7z6woi+xfu+XoGe5b/xmms6/m1j6/l0/q+V8pEHSS3ioGBmQEd7AcqBtG7JfSKDkgY7j4oZbR4n6TBInSFAHHurIaGEljbAAAAAElFTkSuQmCC";
+
+const LOBSTER_YELLOW_PNG_B64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAAACXBIWXMAAAsTAAALEwEAmpwYAAABlklEQVR42l1SyS8DcRT+LL24ibOIpImkiAQRJGI9SEvstTa1TaNMS1vdVGIpUTRaIRQHQiQOnBw5Wv6CHvwFvUgkLnry8w1mIl7yZpL3vuW9NwMwVqdQtj0L76gRxa4BjJuqkaPUHWaM9DWidMuJyfVpdEGN6BwScQ/up3sw4RlGcKYXzVIHatxDcLA2RbEj9p80QmIBVwcBiLAdIjSOmN8CU9CKYaZMd7HjQpqYZG8DdN+E3XlIN1EIvt8HW1DFRpijHFfokb/pQFLpkbCnOXTVIXvfB9+aHTdyH+wcI8X85A7OZQmn7MXHTMhT8RnKw9KKQqo3RGScnSxCHAYhYm488hD1tk6U/2IzNYK9G4a5fkQ2ZhClvTgKQXDZS6cZYdaNmnh77Q+LlzF6R3DLhd+WJIgVGz4DVqR9FjyQIP2d5ptAawObJyS9ECCoLHjiFGvX3KdVwajiamQS6OXt/f3NeDQ34ZVAmQKRthrk/nXQli8pQDY/oo7jPTM/6FqkNCr1yML/UE6rvPlruLnHHfOC6uf/gV8IGIjLPV5mIwAAAABJRU5ErkJggg==";
+
+const LOBSTER_WHITE_PNG_B64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAAACXBIWXMAAAsTAAALEwEAmpwYAAABtUlEQVR42l1QSUtCYRS1wU27aN2iVaBEkBC0MmgT6qaFiJii5lBqisNzxFlRME1RcEjJgSAcUGhZy8xf4KJf4CYI2uTKr/MkH+KF+z5495xzzz0sFioSiRyWSiVKoVBwbTabWiQSbdH/rVbrpVgsPsjn85p0On3BWlStVis1Go03s9l85fV6PQaD4Uyn0524XK5bo9F4Xa1Wy/V6/YMhdDqdZzQpFAokkUjcgyQMBAKycDhsgjppNpvTbrc75vF47DkBCtrRaERardYPLByjo1KptMLlcncrlcqYnrXb7Tyzgc/nb0LFmcvlehaL5cZut0+cTucMrzmVSj1ilpXL5TsL/Br90Wg0exKJ5LRYLNYHgwGBBQLfQwD5SqXy6B+7zhD0ej3H7XYnseWu1+uRfr9PYPUJm6IIQ8CIB4PBOQvJCHDoSywW+85kMiSbzc7i8fg0FAq9OxwO7bKbOUGlUnH8fv8DkvlESsTj8RAITCDYhdg5jVmIL2oduVMAu2Qy2RD9BSsmn8+XFAqF28sbmOPptMrlMhsWRhRF/arV6n16gJg3WKtFg+kXR9pg6xXdgsXmKvAPTkHLpV7QK9sAAAAASUVORK5CYII=";
+
 const TERMINAL_PROFILES = ["auto", "apple-terminal", "iterm2", "warp", "generic"] as const;
+const LOBSTER_STYLES = ["auto", "text", "image"] as const;
 
 const TERMINAL_DEFAULTS: Record<
   TerminalProfile,
@@ -203,6 +219,16 @@ function parseSymbolWidth(value: string | undefined): SymbolWidth {
   throw new Error("--emoji-width must be one of: auto, 1, 2");
 }
 
+function parseLobsterStyle(value: string | undefined): LobsterStyleOption {
+  const normalized = String(value ?? "auto")
+    .trim()
+    .toLowerCase();
+  if (LOBSTER_STYLES.includes(normalized as LobsterStyleOption)) {
+    return normalized as LobsterStyleOption;
+  }
+  throw new Error("--lobster-style must be one of: auto, text, image");
+}
+
 export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOptions {
   const logs = String(raw.logs ?? "").trim() || "/tmp/openclaw/openclaw-*.log";
   const warnSeconds = parsePositiveNumber(raw.warnSeconds ?? "60", "--warn-seconds");
@@ -212,6 +238,7 @@ export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOption
   const decaySide = raw.decaySide === "right" ? "right" : "left";
   const terminalProfile = parseTerminalProfile(raw.terminalProfile ?? "auto");
   const emojiWidth = parseSymbolWidth(raw.emojiWidth ?? "auto");
+  const lobsterStyle = parseLobsterStyle(raw.lobsterStyle ?? "auto");
 
   if (criticalSeconds <= warnSeconds) {
     throw new Error("--critical-seconds must be greater than --warn-seconds");
@@ -244,6 +271,7 @@ export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOption
     hideCursor: raw.hideCursor !== false,
     terminalProfile,
     emojiWidth,
+    lobsterStyle,
   };
 }
 
@@ -263,8 +291,28 @@ export function detectTerminalProfileFromEnv(
   return "generic";
 }
 
+function buildIterm2InlineImageSequence(
+  pngBase64: string,
+  params: { name: string; widthCells?: number; heightCells?: number },
+): string {
+  const widthCells = params.widthCells ?? 2;
+  const heightCells = params.heightCells ?? 1;
+  const nameB64 = Buffer.from(params.name, "utf8").toString("base64");
+  return `\u001b]1337;File=name=${nameB64};width=${widthCells};height=${heightCells};inline=1;preserveAspectRatio=1:${pngBase64}\u0007`;
+}
+
+function buildIterm2LobsterSymbols(): Record<"ok" | "warn" | "critical", string> {
+  return {
+    ok: buildIterm2InlineImageSequence(LOBSTER_RED_PNG_B64, { name: "lobster-ok" }),
+    warn: buildIterm2InlineImageSequence(LOBSTER_YELLOW_PNG_B64, { name: "lobster-warn" }),
+    critical: buildIterm2InlineImageSequence(LOBSTER_WHITE_PNG_B64, {
+      name: "lobster-critical",
+    }),
+  };
+}
+
 export function resolveRuntimeTerminalConfig(
-  options: Pick<ParsedMonitorOptions, "terminalProfile" | "emojiWidth">,
+  options: Pick<ParsedMonitorOptions, "terminalProfile" | "emojiWidth" | "lobsterStyle">,
   env: NodeJS.ProcessEnv = process.env,
 ): RuntimeTerminalConfig {
   const profile =
@@ -273,14 +321,33 @@ export function resolveRuntimeTerminalConfig(
       : (options.terminalProfile as TerminalProfile);
 
   const defaults = TERMINAL_DEFAULTS[profile];
-  const symbolWidth = options.emojiWidth === "auto" ? defaults.symbolWidth : options.emojiWidth;
   const drawPrefix = defaults.drawStrategy === "clear-line" ? ANSI_CLEAR_LINE_PREFIX : "\r";
+
+  const effectiveLobsterStyle: LobsterStyle =
+    options.lobsterStyle === "auto"
+      ? profile === "iterm2"
+        ? "image"
+        : "text"
+      : options.lobsterStyle === "image" && profile !== "iterm2"
+        ? "text"
+        : options.lobsterStyle;
+
+  const symbolWidth: SymbolWidth =
+    effectiveLobsterStyle === "image"
+      ? options.emojiWidth === "auto"
+        ? 2
+        : options.emojiWidth
+      : options.emojiWidth === "auto"
+        ? defaults.symbolWidth
+        : options.emojiWidth;
 
   return {
     profile,
     drawPrefix,
     symbolWidth,
     supportsCursorHide: defaults.supportsCursorHide,
+    lobsterStyle: effectiveLobsterStyle,
+    imageSymbols: effectiveLobsterStyle === "image" ? buildIterm2LobsterSymbols() : null,
   };
 }
 
@@ -361,9 +428,9 @@ function repeatToWidth(
   columns: number,
   minOne: boolean,
   widthOverride: SymbolWidth,
-): string {
+): { value: string; usedColumns: number } {
   if (columns <= 0) {
-    return "";
+    return { value: "", usedColumns: 0 };
   }
 
   const symbolWidth = resolveSymbolWidth(symbol, widthOverride);
@@ -372,9 +439,13 @@ function repeatToWidth(
     count = 1;
   }
   if (count <= 0) {
-    return "";
+    return { value: "", usedColumns: 0 };
   }
-  return symbol.repeat(count);
+
+  return {
+    value: symbol.repeat(count),
+    usedColumns: count * symbolWidth,
+  };
 }
 
 export function buildBarArea(params: {
@@ -392,29 +463,46 @@ export function buildBarArea(params: {
   }
 
   const clamped = Math.max(0, Math.min(Math.floor(filledColumns), totalColumns));
-  const bar = repeatToWidth(symbol, clamped, clamped > 0, symbolWidth);
-  const usedColumns = Math.min(totalColumns, displayWidth(bar));
-  const gap = " ".repeat(Math.max(0, totalColumns - usedColumns));
+  const repeated = repeatToWidth(symbol, clamped, clamped > 0, symbolWidth);
+  const gap = " ".repeat(Math.max(0, totalColumns - repeated.usedColumns));
 
   if (decaySide === "left") {
-    return `${gap}${bar}`;
+    return `${gap}${repeated.value}`;
   }
-  return `${bar}${gap}`;
+  return `${repeated.value}${gap}`;
+}
+
+function pickStateSymbol(
+  options: ParsedMonitorOptions,
+  runtime: RuntimeTerminalConfig | undefined,
+  state: "ok" | "warn" | "critical",
+): string {
+  if (runtime?.lobsterStyle === "image" && runtime.imageSymbols) {
+    return runtime.imageSymbols[state];
+  }
+  if (state === "ok") {
+    return options.okEmoji;
+  }
+  if (state === "warn") {
+    return options.warnEmoji;
+  }
+  return options.criticalEmoji;
 }
 
 export function renderMonitorLine(
   options: ParsedMonitorOptions,
   idleMs: number,
   totalColumns: number,
-  symbolWidth: SymbolWidth = options.emojiWidth,
+  runtime?: RuntimeTerminalConfig,
 ): string {
   const idleSeconds = Math.max(0, idleMs / 1000);
   const prefix = `[${formatElapsed(idleSeconds)}] `;
   const availableColumns = Math.max(0, totalColumns - displayWidth(prefix));
+  const symbolWidth = runtime?.symbolWidth ?? options.emojiWidth;
 
   if (idleSeconds >= options.criticalSeconds) {
     const area = buildBarArea({
-      symbol: options.criticalEmoji,
+      symbol: pickStateSymbol(options, runtime, "critical"),
       filledColumns: availableColumns,
       totalColumns: availableColumns,
       decaySide: "right",
@@ -425,9 +513,9 @@ export function renderMonitorLine(
 
   const remaining = Math.max(0, 1 - idleSeconds / options.criticalSeconds);
   const filledColumns = Math.round(availableColumns * remaining);
-  const symbol = idleSeconds >= options.warnSeconds ? options.warnEmoji : options.okEmoji;
+  const state: "ok" | "warn" = idleSeconds >= options.warnSeconds ? "warn" : "ok";
   const area = buildBarArea({
-    symbol,
+    symbol: pickStateSymbol(options, runtime, state),
     filledColumns,
     totalColumns: availableColumns,
     decaySide: options.decaySide,
@@ -474,6 +562,10 @@ export async function runMonitorCommand(options: ParsedMonitorOptions): Promise<
   const shouldHideCursor =
     options.hideCursor && terminalConfig.supportsCursorHide && Boolean(process.stdout.isTTY);
 
+  if (options.lobsterStyle === "image" && terminalConfig.lobsterStyle !== "image") {
+    process.stderr.write("warning: --lobster-style image requires iTerm2; falling back to text.\n");
+  }
+
   try {
     if (shouldHideCursor) {
       process.stdout.write(ANSI_HIDE_CURSOR);
@@ -485,17 +577,14 @@ export async function runMonitorCommand(options: ParsedMonitorOptions): Promise<
         lastActivityMs = now;
       }
 
-      const line = renderMonitorLine(
-        options,
-        now - lastActivityMs,
-        resolveWidth(options.width),
-        terminalConfig.symbolWidth,
-      );
-      const lineWidth = displayWidth(line);
-      const pad = " ".repeat(Math.max(0, previousWidth - lineWidth));
+      const totalColumns = resolveWidth(options.width);
+      const line = renderMonitorLine(options, now - lastActivityMs, totalColumns, terminalConfig);
+      const visualWidth =
+        terminalConfig.lobsterStyle === "image" ? totalColumns : displayWidth(line);
+      const pad = " ".repeat(Math.max(0, previousWidth - visualWidth));
 
       process.stdout.write(`${terminalConfig.drawPrefix}${line}${pad}`);
-      previousWidth = lineWidth;
+      previousWidth = visualWidth;
 
       try {
         await delay(options.refreshMs, undefined, { signal: signalController.signal });
@@ -545,6 +634,11 @@ export function registerMonitorCli(program: Command) {
       "--emoji-width <auto|1|2>",
       "Override emoji cell width assumption (useful if a terminal renders differently)",
       "auto",
+    )
+    .addOption(
+      new Option("--lobster-style <style>", "Lobster style: text/image or auto-detect")
+        .choices(["auto", "text", "image"])
+        .default("auto"),
     )
     .addHelpText(
       "after",
