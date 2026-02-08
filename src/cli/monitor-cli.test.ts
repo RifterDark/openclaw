@@ -133,15 +133,13 @@ describe("resolveRuntimeTerminalConfig", () => {
     expect(cfg.lobsterStyle).toBe("text");
   });
 
-  it("auto-enables image lobsters for iTerm2", () => {
+  it("defaults to text symbols on iTerm2 in auto lobster mode", () => {
     const parsed = parseMonitorOptions({ colorMode: "dark" });
     const cfg = resolveRuntimeTerminalConfig(parsed, { TERM_PROGRAM: "iTerm.app" });
     expect(cfg.profile).toBe("iterm2");
-    expect(cfg.lobsterStyle).toBe("image");
+    expect(cfg.lobsterStyle).toBe("text");
     expect(cfg.colorMode).toBe("dark");
-    expect(cfg.imageSymbols?.ok).toContain("1337;File=");
-    expect(cfg.imageSymbols?.warn).toContain("1337;File=");
-    expect(cfg.imageSymbols?.critical).toContain("1337;File=");
+    expect(cfg.imageSymbols).toBeNull();
     expect(cfg.symbolWidth).toBe(2);
   });
 

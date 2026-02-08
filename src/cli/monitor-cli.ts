@@ -415,9 +415,7 @@ export function resolveRuntimeTerminalConfig(
 
   const effectiveLobsterStyle: LobsterStyle =
     options.lobsterStyle === "auto"
-      ? profile === "iterm2"
-        ? "image"
-        : "text"
+      ? "text"
       : options.lobsterStyle === "image" && profile !== "iterm2"
         ? "text"
         : options.lobsterStyle;

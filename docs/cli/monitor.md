@@ -57,7 +57,7 @@ openclaw monitor --lobster-style image --terminal-profile iterm2
 - `--terminal-profile <auto|apple-terminal|iterm2|warp|generic>`: terminal-specific rendering profile (default: `auto`)
 - `--color-mode <auto|dark|light>`: pick dark/light palette or auto-detect from system appearance (default: `auto`)
 - `--emoji-width <auto|1|2>`: override emoji cell width assumption for bar math (default: `auto`)
-- `--lobster-style <auto|text|image>`: choose text symbols or iTerm2 inline images (default: `auto`)
+- `--lobster-style <auto|text|image>`: choose text symbols or iTerm2 inline images (default: `auto`, which uses text)
 
 ## Notes
 
@@ -67,6 +67,7 @@ openclaw monitor --lobster-style image --terminal-profile iterm2
 - `--width auto` tracks terminal width live; resizing applies on the next redraw tick.
 - Warp uses a clear-line redraw strategy to reduce artifacts when symbols change width.
 - On Warp text mode, the default critical `⬜` is replaced with a solid `██` fallback to avoid hollow-square glyph rendering.
-- `--lobster-style image` uses embedded lobster PNGs for all states (derived from the macOS lobster glyph), with a frozen red OK lobster; warning is yellow in dark mode and orange in light mode, and critical switches white (dark mode) or black (light mode), via iTerm2's inline image protocol.
+- iTerm2 now defaults to text symbols in `auto` mode (same behavior as Apple Terminal/Warp).
+- `--lobster-style image` is opt-in and uses embedded lobster PNGs for all states (derived from the macOS lobster glyph), with a frozen red OK lobster; warning is yellow in dark mode and orange in light mode, and critical switches white (dark mode) or black (light mode), via iTerm2's inline image protocol.
 - If image mode is requested on non-iTerm2 terminals, monitor falls back to text symbols.
 - If logs rotate or truncate, monitoring continues automatically.
