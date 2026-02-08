@@ -30,6 +30,7 @@ This page describes the current CLI behavior. If commands change, update this do
 - [`sessions`](/cli/sessions)
 - [`gateway`](/cli/gateway)
 - [`logs`](/cli/logs)
+- [`monitor`](/cli/monitor)
 - [`system`](/cli/system)
 - [`models`](/cli/models)
 - [`memory`](/cli/memory)
@@ -146,6 +147,7 @@ openclaw [--dev] [--profile <name>] <command>
     restart
     run
   logs
+  monitor
   system
     event
     heartbeat last|enable|disable

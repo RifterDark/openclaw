@@ -65,6 +65,14 @@ const entries: SubCliEntry[] = [
     },
   },
   {
+    name: "monitor",
+    description: "Single-line log activity monitor",
+    register: async (program) => {
+      const mod = await import("../monitor-cli.js");
+      mod.registerMonitorCli(program);
+    },
+  },
+  {
     name: "system",
     description: "System events, heartbeat, and presence",
     register: async (program) => {
