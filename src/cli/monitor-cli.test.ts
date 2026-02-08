@@ -102,11 +102,13 @@ describe("parseMonitorOptions", () => {
     expect(parsed.lobsterStyle).toBe("text");
     expect(parsed.colorMode).toBe("light");
     expect(parsed.resolvedColorMode).toBe("light");
+    expect(parsed.warnEmoji).toBe("🟧");
     expect(parsed.criticalEmoji).toBe("⬛");
   });
 
-  it("applies dark-mode default critical symbol", () => {
+  it("applies dark-mode default warning/critical symbols", () => {
     const parsed = parseMonitorOptions({ colorMode: "dark" });
+    expect(parsed.warnEmoji).toBe("🟨");
     expect(parsed.criticalEmoji).toBe("⬜");
     expect(parsed.resolvedColorMode).toBe("dark");
   });
@@ -143,7 +145,7 @@ describe("resolveRuntimeTerminalConfig", () => {
     expect(cfg.symbolWidth).toBe(2);
   });
 
-  it("switches critical image between dark and light color modes", () => {
+  it("switches warning/critical images between dark and light color modes", () => {
     const dark = resolveRuntimeTerminalConfig(
       parseMonitorOptions({ colorMode: "dark", lobsterStyle: "image", terminalProfile: "iterm2" }),
       { TERM_PROGRAM: "iTerm.app" },
@@ -153,6 +155,7 @@ describe("resolveRuntimeTerminalConfig", () => {
       { TERM_PROGRAM: "iTerm.app" },
     );
 
+    expect(dark.imageSymbols?.warn).not.toBe(light.imageSymbols?.warn);
     expect(dark.imageSymbols?.critical).not.toBe(light.imageSymbols?.critical);
     expect(dark.colorMode).toBe("dark");
     expect(light.colorMode).toBe("light");

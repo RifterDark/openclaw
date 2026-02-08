@@ -80,6 +80,9 @@ const LOBSTER_RED_PNG_B64 =
 const LOBSTER_YELLOW_PNG_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAACeklEQVR42oWTS0hUYRTHf9+9d5xxZnziGx+RMxCDgraQQYi0lUgLaRmt7EG2a9m6VbQIQipo0T7ChRRFVCSRGqWWVBP4SMdHo07jzNx53Xtn7m3hzKQZdTYfnPP9/pxz/hw4GOKP929xoCbvT964jGfQz0Uzw9LyFol8XgKsgW7qRs5wpa+L6MtZdgqMBGBZFgA1ldxsrueyt41L14exAdZe2ZJ87VxobuB8Yw239jMKIIQQVq+XBkWm32HHVWKjZyuMNNCNSzcQ6y9OZ4SgW1FoV2y0nDjGESHECiAphVnK3ZBMk2usQ3HY0XIKQ95WOgBx+/6TL/YSsmUulPAuqQr37z1I+TbFszlCUZXXwU3QDVY/LzIly4xYFlc/fuOTabK8ugGRGJOPP/A9z5sSgN+zt4u1H9yLJ6G9haaeTo6e8lM12IfzuA+Pz0OjmoKNEHfzjFxwQaxHMK+dpby2muq0hi4J+jM6gz4v1Q47YilIryRoiSUYc5Yy09FKYmyKJCCkwizhCJUZjZOyRFMozDsji0uWkbI5MAwcayFmbQr1QtBnWtQW7C8KxJNkjSyqppNx2HHLEquGAZoGpsV6qR2XpmNoOolUBiOPWUUBI4umJliMJ3g7F2DE5eRBOgOpNNgUHs185VxMZTKuMi9EUaDoAps7REfHeaqmmNINVN0gGI1DVIWMRtDtRE2leT86zvPAMuuHOphexAQwTSILa6iA2AqT247s2fXwjZUTgk3AKvw9dBh+D3IsSenwEJUVZcz/jFKlG1DmIqEm6Xo1TajTizY6TrbAKPsF8sqJ8C45AXdiKm1GFpwONhZW2J4IkJwI/PNS/xuH4F+GDw6HHMcAsAAAAABJRU5ErkJggg==";
 
+const LOBSTER_ORANGE_PNG_B64 =
+  "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAACj0lEQVR4nGNgQAWMaDQ2wIhTcHE0u8rKOPbyIDVWSSRxJhAjVJNFbEUMR+n8cHZtDIP+//8P5uzO5Fx/qojrfr0TW/2cUHZWmML///8zdXiwVZ0s4rqxN5NrF7IeEAAzXORZJQ5kc324Usn1u9WdbWujMxt7qCYLt58qC8//1d4snZ5sq8+Vcf4+lMfx1UOJRQGsE+o6RhARqskisSmZ8+3deq7//b5s67q92MObXNiam1zYWrq92CMn+bMtB8ltS+P4GK3DqohsANyQ+eHsa3dlcP7v8GDrD9NikWt1Z3vT6Mz2NUiNVavfl611Zzrn/4UR7NsZ0IGjHAsziK51ZHNdGcf+f1MS58rpQewOVyq5/t6o5fzf58PmdzCXYx5IrtGZzQ9ZD9z2CX5sfPPD2a1nhbBPXxHD8XBaIPut522cf1+1c/2f5M/2YHU8x52ZweyzZwazOzY6s4kg62UEERW2bHLTAtmr5oaxb+z2Yl81wY/t6etOjv9PWzn/d3uxv+j0ZFs1P4x906wQ9sZ6JzZNjEDMMGGVmuDHljs1gH3l1AD2bVP82Y+BNN+p4/rf6cl2Zoo/+9ZpgexrJ/mzlRZZs6pguCDJgFW40ZnNs8WNLS9ah1V+YQR76q06zv8XysCxUhGmxSLY4sZW3OjM5l5iwyqPbAADcqCU2rKaBquzCs0KYXc/Xsj5f28W5/9Wd7aoNGMWlgpbNjuQJuQAZEACYNOKrFmVVQRYWGeFsHusjuf4sziaHWRABCjlVdqxoTgdA4BM1hdj4VkWwyGzPZ3j3cII9v+zQtj/r4xj/zwrhF3ZS5mVu9GZjQWrZmST+3zYOJdHc7T0+7It7vRkW7wshqMjz5yVF6/tRAIMzQDeidJsX26i9gAAAABJRU5ErkJggg==";
+
 const LOBSTER_WHITE_PNG_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAACqklEQVR42oVTz08TQRR+Mzu77VIr7EKrLZAapSEkprEh8dCLciOejKcmeFMb4ebf4cGbeiDxHzAeuHgtMSKyaNKGkkD8xUa7jS3NstNtmd3ZHQ+2pPgjfJeXvJfvm/feNw/gNNAf8V84VZOGkysrKzOFQuEB5/yzZVmdfh4DgMjlcslisbgyPz9vG4bRHHAwAIAQAgAAxsfHH6fT6YeZTKZUKpVkABC/ywLPzc3dT6VS9yYmJp4McwgAIISQyGQyFzHGC4qixGRZvm6aJs7lcjHOOSqXy8cY4zwh5Iosy9Ozs7OXEELfAACTwSzJZBIYY0EkEiGyLDNd12/HYrGrAIBWV1drsixzVVVJq9Xqjo6OnuwB99tEhmE0HMcpW5YFQRAc7O3tvZMkaVkI8ahWq1XCMPxiWRZQSje2tra+9vkhGRIKLMt6LsvynampqbSiKJfz+byGMcaqqs5ks9mUbdtQr9efDRkQSP1thktLS+c1TdM9z/Mwxguc81vZbFaPRCLINM0CQmiaUvoqGo1+mJyc7Ozv77sAgPBglqOjo7EgCG5gjNPNZvO97/sxSZJwEATg+37UsqyPhJALGOObhJDEwP4TgXa7zRlj1Pf9Y0VRzmGMDzjnwBgDAPiuqmrM8zyfMdbpdrt+nyZOBHzfZ5TST5TSt5VKZXlkZORFr9eDXq8HCKGX29vbdx3H2XBdt0oIGQgA6bsAhmHYhmG8XlxcbDHGqOd5puM4wBgDzrmp6zr1PM9YW1t7M/iApzoAgBAAgDHW3t3dpUII1Gq1gsPDQxBChOVyORBC1PsPhvCfo5ESiYRaLBbH4vF41bZtzfM8iMfjHdd1r21ubjY0TWPr6+t8eIRhhM1ms9NoNAKE0FNKaYZzDtFo9MfOzs7ParXqnnGpZ+Iv8i+Mqk4y9g+F5wAAAABJRU5ErkJggg==";
 
@@ -323,7 +326,7 @@ export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOption
   }
 
   const okEmoji = raw.okEmoji ?? "🦞";
-  const warnEmoji = raw.warnEmoji ?? "🟨";
+  const warnEmoji = raw.warnEmoji ?? (resolvedColorMode === "dark" ? "🟨" : "🟧");
   const criticalEmoji = raw.criticalEmoji ?? (resolvedColorMode === "dark" ? "⬜" : "⬛");
 
   if (!okEmoji) {
@@ -384,7 +387,10 @@ function buildIterm2InlineImageSequence(
 function buildIterm2LobsterSymbols(colorMode: ColorMode): Record<"ok" | "warn" | "critical", string> {
   return {
     ok: buildIterm2InlineImageSequence(LOBSTER_RED_PNG_B64, { name: "lobster-ok" }),
-    warn: buildIterm2InlineImageSequence(LOBSTER_YELLOW_PNG_B64, { name: "lobster-warn" }),
+    warn: buildIterm2InlineImageSequence(
+      colorMode === "dark" ? LOBSTER_YELLOW_PNG_B64 : LOBSTER_ORANGE_PNG_B64,
+      { name: "lobster-warn" },
+    ),
     critical: buildIterm2InlineImageSequence(
       colorMode === "dark" ? LOBSTER_WHITE_PNG_B64 : LOBSTER_BLACK_PNG_B64,
       { name: "lobster-critical" },

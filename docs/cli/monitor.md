@@ -48,7 +48,7 @@ openclaw monitor --lobster-style image --terminal-profile iterm2
 - `--warn-seconds <seconds>`: warning threshold for idle time (default: `60`)
 - `--critical-seconds <seconds>`: critical threshold for idle time (default: `120`)
 - `--ok-emoji <emoji>`: healthy-state symbol (default: `🦞`)
-- `--warn-emoji <emoji>`: warning-state symbol (default: `🟨`)
+- `--warn-emoji <emoji>`: warning-state symbol (defaults by mode: dark=`🟨`, light=`🟧`)
 - `--critical-emoji <emoji>`: critical full-width bar symbol (defaults by mode: dark=`⬜`, light=`⬛`)
 - `--decay-side <left|right>`: which side empties during decay (default: `left`)
 - `--refresh-ms <ms>`: redraw interval in milliseconds (default: `250`)
@@ -67,6 +67,6 @@ openclaw monitor --lobster-style image --terminal-profile iterm2
 - `--width auto` tracks terminal width live; resizing applies on the next redraw tick.
 - Warp uses a clear-line redraw strategy to reduce artifacts when symbols change width.
 - On Warp text mode, the default critical `⬜` is replaced with a solid `██` fallback to avoid hollow-square glyph rendering.
-- `--lobster-style image` uses embedded lobster PNGs for all states (derived from the macOS lobster glyph), with a frozen red OK lobster; warning stays yellow, and critical switches white (dark mode) or black (light mode), via iTerm2's inline image protocol.
+- `--lobster-style image` uses embedded lobster PNGs for all states (derived from the macOS lobster glyph), with a frozen red OK lobster; warning is yellow in dark mode and orange in light mode, and critical switches white (dark mode) or black (light mode), via iTerm2's inline image protocol.
 - If image mode is requested on non-iTerm2 terminals, monitor falls back to text symbols.
 - If logs rotate or truncate, monitoring continues automatically.
