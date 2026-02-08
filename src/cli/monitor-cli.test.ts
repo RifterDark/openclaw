@@ -94,7 +94,8 @@ describe("resolveRuntimeTerminalConfig", () => {
     const cfg = resolveRuntimeTerminalConfig(parsed, { TERM_PROGRAM: "iTerm.app" });
     expect(cfg.profile).toBe("iterm2");
     expect(cfg.lobsterStyle).toBe("image");
-    expect(cfg.imageSymbols?.ok).toContain("1337;File=");
+    expect(cfg.imageSymbols?.warn).toContain("1337;File=");
+    expect(cfg.imageSymbols?.critical).toContain("1337;File=");
     expect(cfg.symbolWidth).toBe(2);
   });
 
@@ -165,6 +166,21 @@ describe("renderMonitorLine", () => {
 
     expect(line.startsWith("[00:05] ")).toBe(true);
     expect(line).toContain("1337;File=");
+  });
+
+  it("keeps healthy state on native emoji even in image mode", () => {
+    const options = parseMonitorOptions({
+      warnSeconds: "5",
+      criticalSeconds: "10",
+      width: "20",
+      lobsterStyle: "image",
+      terminalProfile: "iterm2",
+    });
+    const runtime = resolveRuntimeTerminalConfig(options, { TERM_PROGRAM: "iTerm.app" });
+    const line = renderMonitorLine(options, 0, 20, runtime);
+
+    expect(line).toContain("🦞");
+    expect(line).not.toContain("1337;File=");
   });
 });
 
