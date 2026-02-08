@@ -35,6 +35,9 @@ openclaw monitor --decay-side right
 # Force Warp profile if auto-detect is wrong
 openclaw monitor --terminal-profile warp
 
+# Keep redraw-only behavior (disable clear on resize/Enter)
+openclaw monitor --no-clear-on-events
+
 # Override emoji width if a terminal renders symbols unexpectedly
 openclaw monitor --emoji-width 1
 
@@ -54,6 +57,7 @@ openclaw monitor --lobster-style image --terminal-profile iterm2
 - `--refresh-ms <ms>`: redraw interval in milliseconds (default: `250`)
 - `--width <columns|auto>`: fixed width or terminal auto-detect (default: `auto`)
 - `--no-hide-cursor`: keep the cursor visible while monitoring (default behavior hides it)
+- `--no-clear-on-events`: disable clear/redraw when terminal is resized or Enter is pressed (default behavior clears)
 - `--terminal-profile <auto|apple-terminal|iterm2|warp|generic>`: terminal-specific rendering profile (default: `auto`)
 - `--color-mode <auto|dark|light>`: pick dark/light palette or auto-detect from system appearance (default: `auto`)
 - `--emoji-width <auto|1|2>`: override emoji cell width assumption for bar math (default: `auto`)
@@ -66,7 +70,7 @@ openclaw monitor --lobster-style image --terminal-profile iterm2
 - Cursor is hidden while running and restored on exit (use `--no-hide-cursor` to disable).
 - `--width auto` tracks terminal width live; resizing applies on the next redraw tick.
 - Warp uses a clear-line redraw strategy to reduce artifacts when symbols change width.
-- On terminal resize (`SIGWINCH`) or when Enter is pressed, monitor clears and redraws the screen to avoid stale wrapped lines.
+- On terminal resize (`SIGWINCH`) or when Enter is pressed, monitor clears and redraws the screen to avoid stale wrapped lines (disable with `--no-clear-on-events`).
 - On Warp text mode, the default critical `⬜` is replaced with a solid `██` fallback to avoid hollow-square glyph rendering.
 - iTerm2 now defaults to text symbols in `auto` mode (same behavior as Apple Terminal/Warp).
 - `--lobster-style image` is opt-in and uses embedded lobster PNGs for all states (derived from the macOS lobster glyph), with a frozen red OK lobster; warning is yellow in dark mode and orange in light mode, and critical switches white (dark mode) or black (light mode), via iTerm2's inline image protocol.

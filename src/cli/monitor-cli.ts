@@ -26,6 +26,7 @@ type MonitorCliOptions = {
   refreshMs?: string;
   width?: string;
   hideCursor?: boolean;
+  clearOnEvents?: boolean;
   terminalProfile?: TerminalProfileOption;
   emojiWidth?: string;
   lobsterStyle?: LobsterStyleOption;
@@ -43,6 +44,7 @@ type ParsedMonitorOptions = {
   refreshMs: number;
   width: number | "auto";
   hideCursor: boolean;
+  clearOnEvents: boolean;
   terminalProfile: TerminalProfileOption;
   emojiWidth: SymbolWidth;
   lobsterStyle: LobsterStyleOption;
@@ -351,6 +353,7 @@ export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOption
     refreshMs,
     width,
     hideCursor: raw.hideCursor !== false,
+    clearOnEvents: raw.clearOnEvents !== false,
     terminalProfile,
     emojiWidth,
     lobsterStyle,
@@ -642,8 +645,9 @@ function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
 }
 
-function createSignalController() {
+function createSignalController(options?: { enableEventClear?: boolean }) {
   const controller = new AbortController();
+  const enableEventClear = options?.enableEventClear !== false;
   let needsFullClear = false;
 
   const stop = () => controller.abort();
@@ -659,18 +663,20 @@ function createSignalController() {
 
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
-  process.on("SIGWINCH", markNeedsClear);
 
-  const stdinIsTty = Boolean(process.stdin.isTTY);
-  if (stdinIsTty) {
-    process.stdin.on("data", handleStdinData);
-    process.stdin.resume();
+  const stdinIsTty = enableEventClear && Boolean(process.stdin.isTTY);
+  if (enableEventClear) {
+    process.on("SIGWINCH", markNeedsClear);
+    if (stdinIsTty) {
+      process.stdin.on("data", handleStdinData);
+      process.stdin.resume();
+    }
   }
 
   return {
     signal: controller.signal,
     consumeNeedsFullClear: () => {
-      if (!needsFullClear) {
+      if (!enableEventClear || !needsFullClear) {
         return false;
       }
       needsFullClear = false;
@@ -679,10 +685,12 @@ function createSignalController() {
     dispose: () => {
       process.off("SIGINT", stop);
       process.off("SIGTERM", stop);
-      process.off("SIGWINCH", markNeedsClear);
-      if (stdinIsTty) {
-        process.stdin.off("data", handleStdinData);
-        process.stdin.pause();
+      if (enableEventClear) {
+        process.off("SIGWINCH", markNeedsClear);
+        if (stdinIsTty) {
+          process.stdin.off("data", handleStdinData);
+          process.stdin.pause();
+        }
       }
     },
   };
@@ -692,7 +700,7 @@ export async function runMonitorCommand(options: ParsedMonitorOptions): Promise<
   const watcher = new LogGrowthWatcher(options.logs);
   let lastActivityMs = Date.now();
   let previousWidth = 0;
-  const signalController = createSignalController();
+  const signalController = createSignalController({ enableEventClear: options.clearOnEvents });
   const terminalConfig = resolveRuntimeTerminalConfig(options);
   const shouldHideCursor =
     options.hideCursor && terminalConfig.supportsCursorHide && Boolean(process.stdout.isTTY);
@@ -762,6 +770,10 @@ export function registerMonitorCli(program: Command) {
     .option("--refresh-ms <ms>", "Redraw interval in milliseconds", "250")
     .option("--width <columns|auto>", "Monitor width in columns, or auto", "auto")
     .option("--no-hide-cursor", "Keep the cursor visible while monitoring")
+    .option(
+      "--no-clear-on-events",
+      "Disable full-screen clear/redraw on terminal resize or Enter",
+    )
     .addOption(
       new Option(
         "--terminal-profile <profile>",

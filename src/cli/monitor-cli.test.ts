@@ -83,6 +83,7 @@ describe("parseMonitorOptions", () => {
     const parsed = parseMonitorOptions({});
     expect(parsed.decaySide).toBe("left");
     expect(parsed.hideCursor).toBe(true);
+    expect(parsed.clearOnEvents).toBe(true);
     expect(parsed.terminalProfile).toBe("auto");
     expect(parsed.emojiWidth).toBe("auto");
     expect(parsed.lobsterStyle).toBe("auto");
@@ -93,11 +94,13 @@ describe("parseMonitorOptions", () => {
   it("supports --no-hide-cursor and width overrides", () => {
     const parsed = parseMonitorOptions({
       hideCursor: false,
+      clearOnEvents: false,
       emojiWidth: "2",
       lobsterStyle: "text",
       colorMode: "light",
     });
     expect(parsed.hideCursor).toBe(false);
+    expect(parsed.clearOnEvents).toBe(false);
     expect(parsed.emojiWidth).toBe(2);
     expect(parsed.lobsterStyle).toBe("text");
     expect(parsed.colorMode).toBe("light");
