@@ -109,6 +109,11 @@ describe("parseMonitorOptions", () => {
     expect(parsed.criticalEmoji).toBe("⬛");
   });
 
+  it("supports --no-clear alias", () => {
+    const parsed = parseMonitorOptions({ clear: false });
+    expect(parsed.clearOnEvents).toBe(false);
+  });
+
   it("applies dark-mode default warning/critical symbols", () => {
     const parsed = parseMonitorOptions({ colorMode: "dark" });
     expect(parsed.warnEmoji).toBe("🟨");

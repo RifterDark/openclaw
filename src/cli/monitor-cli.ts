@@ -27,6 +27,7 @@ type MonitorCliOptions = {
   width?: string;
   hideCursor?: boolean;
   clearOnEvents?: boolean;
+  clear?: boolean;
   terminalProfile?: TerminalProfileOption;
   emojiWidth?: string;
   lobsterStyle?: LobsterStyleOption;
@@ -353,7 +354,7 @@ export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOption
     refreshMs,
     width,
     hideCursor: raw.hideCursor !== false,
-    clearOnEvents: raw.clearOnEvents !== false,
+    clearOnEvents: raw.clearOnEvents !== false && raw.clear !== false,
     terminalProfile,
     emojiWidth,
     lobsterStyle,
@@ -772,8 +773,9 @@ export function registerMonitorCli(program: Command) {
     .option("--no-hide-cursor", "Keep the cursor visible while monitoring")
     .option(
       "--no-clear-on-events",
-      "Disable clear-to-start redraw on terminal resize or Enter",
+      "Disable clear-to-start redraw on terminal resize or Enter (alias: --no-clear)",
     )
+    .addOption(new Option("--no-clear").hideHelp())
     .addOption(
       new Option(
         "--terminal-profile <profile>",
