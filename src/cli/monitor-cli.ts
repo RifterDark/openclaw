@@ -5,6 +5,10 @@ import { formatDocsLink } from "../terminal/links.js";
 import { theme } from "../terminal/theme.js";
 
 type DecaySide = "left" | "right";
+type TerminalProfileOption = "auto" | "apple-terminal" | "iterm2" | "warp" | "generic";
+type TerminalProfile = Exclude<TerminalProfileOption, "auto">;
+type DrawStrategy = "carriage" | "clear-line";
+type SymbolWidth = number | "auto";
 
 type MonitorCliOptions = {
   logs?: string;
@@ -17,6 +21,8 @@ type MonitorCliOptions = {
   refreshMs?: string;
   width?: string;
   hideCursor?: boolean;
+  terminalProfile?: TerminalProfileOption;
+  emojiWidth?: string;
 };
 
 type ParsedMonitorOptions = {
@@ -30,6 +36,8 @@ type ParsedMonitorOptions = {
   refreshMs: number;
   width: number | "auto";
   hideCursor: boolean;
+  terminalProfile: TerminalProfileOption;
+  emojiWidth: SymbolWidth;
 };
 
 type FileState = {
@@ -38,11 +46,51 @@ type FileState = {
   size: number;
 };
 
+type RuntimeTerminalConfig = {
+  profile: TerminalProfile;
+  drawPrefix: string;
+  symbolWidth: SymbolWidth;
+  supportsCursorHide: boolean;
+};
+
 const COMBINING_MARK_RE = /\p{Mark}/u;
 const EXTENDED_PICTOGRAPHIC_RE = /\p{Extended_Pictographic}/u;
 const DEFAULT_TERMINAL_WIDTH = 120;
 const ANSI_HIDE_CURSOR = "\u001b[?25l";
 const ANSI_SHOW_CURSOR = "\u001b[?25h";
+const ANSI_CLEAR_LINE_PREFIX = "\r\u001b[2K";
+
+const TERMINAL_PROFILES = ["auto", "apple-terminal", "iterm2", "warp", "generic"] as const;
+
+const TERMINAL_DEFAULTS: Record<
+  TerminalProfile,
+  {
+    drawStrategy: DrawStrategy;
+    symbolWidth: SymbolWidth;
+    supportsCursorHide: boolean;
+  }
+> = {
+  "apple-terminal": {
+    drawStrategy: "carriage",
+    symbolWidth: 2,
+    supportsCursorHide: true,
+  },
+  iterm2: {
+    drawStrategy: "carriage",
+    symbolWidth: 2,
+    supportsCursorHide: true,
+  },
+  warp: {
+    drawStrategy: "clear-line",
+    symbolWidth: 2,
+    supportsCursorHide: true,
+  },
+  generic: {
+    drawStrategy: "carriage",
+    symbolWidth: "auto",
+    supportsCursorHide: true,
+  },
+};
 
 export class LogGrowthWatcher {
   private readonly states = new Map<string, FileState>();
@@ -131,6 +179,30 @@ function parseWidth(value: string | undefined): number | "auto" {
   return parsed;
 }
 
+function parseTerminalProfile(value: string | undefined): TerminalProfileOption {
+  const normalized = String(value ?? "auto")
+    .trim()
+    .toLowerCase();
+  if (TERMINAL_PROFILES.includes(normalized as TerminalProfileOption)) {
+    return normalized as TerminalProfileOption;
+  }
+  throw new Error("--terminal-profile must be one of auto, apple-terminal, iterm2, warp, generic");
+}
+
+function parseSymbolWidth(value: string | undefined): SymbolWidth {
+  const normalized = String(value ?? "auto")
+    .trim()
+    .toLowerCase();
+  if (normalized === "auto") {
+    return "auto";
+  }
+  const parsed = Number.parseInt(normalized, 10);
+  if (parsed === 1 || parsed === 2) {
+    return parsed;
+  }
+  throw new Error("--emoji-width must be one of: auto, 1, 2");
+}
+
 export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOptions {
   const logs = String(raw.logs ?? "").trim() || "/tmp/openclaw/openclaw-*.log";
   const warnSeconds = parsePositiveNumber(raw.warnSeconds ?? "60", "--warn-seconds");
@@ -138,6 +210,8 @@ export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOption
   const refreshMs = parsePositiveInteger(raw.refreshMs ?? "250", "--refresh-ms");
   const width = parseWidth(raw.width ?? "auto");
   const decaySide = raw.decaySide === "right" ? "right" : "left";
+  const terminalProfile = parseTerminalProfile(raw.terminalProfile ?? "auto");
+  const emojiWidth = parseSymbolWidth(raw.emojiWidth ?? "auto");
 
   if (criticalSeconds <= warnSeconds) {
     throw new Error("--critical-seconds must be greater than --warn-seconds");
@@ -168,6 +242,45 @@ export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOption
     refreshMs,
     width,
     hideCursor: raw.hideCursor !== false,
+    terminalProfile,
+    emojiWidth,
+  };
+}
+
+export function detectTerminalProfileFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): TerminalProfile {
+  const termProgram = String(env.TERM_PROGRAM ?? "").toLowerCase();
+  if (termProgram === "apple_terminal") {
+    return "apple-terminal";
+  }
+  if (termProgram === "iterm.app") {
+    return "iterm2";
+  }
+  if (termProgram === "warpterminal" || termProgram.includes("warp")) {
+    return "warp";
+  }
+  return "generic";
+}
+
+export function resolveRuntimeTerminalConfig(
+  options: Pick<ParsedMonitorOptions, "terminalProfile" | "emojiWidth">,
+  env: NodeJS.ProcessEnv = process.env,
+): RuntimeTerminalConfig {
+  const profile =
+    options.terminalProfile === "auto"
+      ? detectTerminalProfileFromEnv(env)
+      : (options.terminalProfile as TerminalProfile);
+
+  const defaults = TERMINAL_DEFAULTS[profile];
+  const symbolWidth = options.emojiWidth === "auto" ? defaults.symbolWidth : options.emojiWidth;
+  const drawPrefix = defaults.drawStrategy === "clear-line" ? ANSI_CLEAR_LINE_PREFIX : "\r";
+
+  return {
+    profile,
+    drawPrefix,
+    symbolWidth,
+    supportsCursorHide: defaults.supportsCursorHide,
   };
 }
 
@@ -236,12 +349,24 @@ export function formatElapsed(seconds: number): string {
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
-function repeatToWidth(symbol: string, columns: number, minOne: boolean): string {
+function resolveSymbolWidth(symbol: string, widthOverride: SymbolWidth): number {
+  if (widthOverride === "auto") {
+    return Math.max(1, displayWidth(symbol));
+  }
+  return widthOverride;
+}
+
+function repeatToWidth(
+  symbol: string,
+  columns: number,
+  minOne: boolean,
+  widthOverride: SymbolWidth,
+): string {
   if (columns <= 0) {
     return "";
   }
 
-  const symbolWidth = Math.max(1, displayWidth(symbol));
+  const symbolWidth = resolveSymbolWidth(symbol, widthOverride);
   let count = Math.floor(columns / symbolWidth);
   if (count <= 0 && minOne) {
     count = 1;
@@ -257,14 +382,17 @@ export function buildBarArea(params: {
   filledColumns: number;
   totalColumns: number;
   decaySide: DecaySide;
+  symbolWidth?: SymbolWidth;
 }): string {
   const { symbol, filledColumns, totalColumns, decaySide } = params;
+  const symbolWidth = params.symbolWidth ?? "auto";
+
   if (totalColumns <= 0) {
     return "";
   }
 
   const clamped = Math.max(0, Math.min(Math.floor(filledColumns), totalColumns));
-  const bar = repeatToWidth(symbol, clamped, clamped > 0);
+  const bar = repeatToWidth(symbol, clamped, clamped > 0, symbolWidth);
   const usedColumns = Math.min(totalColumns, displayWidth(bar));
   const gap = " ".repeat(Math.max(0, totalColumns - usedColumns));
 
@@ -278,6 +406,7 @@ export function renderMonitorLine(
   options: ParsedMonitorOptions,
   idleMs: number,
   totalColumns: number,
+  symbolWidth: SymbolWidth = options.emojiWidth,
 ): string {
   const idleSeconds = Math.max(0, idleMs / 1000);
   const prefix = `[${formatElapsed(idleSeconds)}] `;
@@ -289,6 +418,7 @@ export function renderMonitorLine(
       filledColumns: availableColumns,
       totalColumns: availableColumns,
       decaySide: "right",
+      symbolWidth,
     });
     return `${prefix}${area}`;
   }
@@ -301,6 +431,7 @@ export function renderMonitorLine(
     filledColumns,
     totalColumns: availableColumns,
     decaySide: options.decaySide,
+    symbolWidth,
   });
   return `${prefix}${area}`;
 }
@@ -339,7 +470,9 @@ export async function runMonitorCommand(options: ParsedMonitorOptions): Promise<
   let lastActivityMs = Date.now();
   let previousWidth = 0;
   const signalController = createSignalController();
-  const shouldHideCursor = options.hideCursor && Boolean(process.stdout.isTTY);
+  const terminalConfig = resolveRuntimeTerminalConfig(options);
+  const shouldHideCursor =
+    options.hideCursor && terminalConfig.supportsCursorHide && Boolean(process.stdout.isTTY);
 
   try {
     if (shouldHideCursor) {
@@ -352,11 +485,16 @@ export async function runMonitorCommand(options: ParsedMonitorOptions): Promise<
         lastActivityMs = now;
       }
 
-      const line = renderMonitorLine(options, now - lastActivityMs, resolveWidth(options.width));
+      const line = renderMonitorLine(
+        options,
+        now - lastActivityMs,
+        resolveWidth(options.width),
+        terminalConfig.symbolWidth,
+      );
       const lineWidth = displayWidth(line);
       const pad = " ".repeat(Math.max(0, previousWidth - lineWidth));
 
-      process.stdout.write(`\r${line}${pad}`);
+      process.stdout.write(`${terminalConfig.drawPrefix}${line}${pad}`);
       previousWidth = lineWidth;
 
       try {
@@ -395,6 +533,19 @@ export function registerMonitorCli(program: Command) {
     .option("--refresh-ms <ms>", "Redraw interval in milliseconds", "250")
     .option("--width <columns|auto>", "Monitor width in columns, or auto", "auto")
     .option("--no-hide-cursor", "Keep the cursor visible while monitoring")
+    .addOption(
+      new Option(
+        "--terminal-profile <profile>",
+        "Terminal profile: auto-detect, or force apple-terminal/iterm2/warp/generic",
+      )
+        .choices(["auto", "apple-terminal", "iterm2", "warp", "generic"])
+        .default("auto"),
+    )
+    .option(
+      "--emoji-width <auto|1|2>",
+      "Override emoji cell width assumption (useful if a terminal renders differently)",
+      "auto",
+    )
     .addHelpText(
       "after",
       () =>

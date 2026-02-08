@@ -4,9 +4,11 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   LogGrowthWatcher,
+  detectTerminalProfileFromEnv,
   formatElapsed,
   parseMonitorOptions,
   renderMonitorLine,
+  resolveRuntimeTerminalConfig,
 } from "./monitor-cli.js";
 
 const tempDirs: string[] = [];
@@ -34,16 +36,31 @@ describe("formatElapsed", () => {
   });
 });
 
+describe("terminal profile detection", () => {
+  it("detects Apple Terminal and iTerm2 from TERM_PROGRAM", () => {
+    expect(detectTerminalProfileFromEnv({ TERM_PROGRAM: "Apple_Terminal" })).toBe("apple-terminal");
+    expect(detectTerminalProfileFromEnv({ TERM_PROGRAM: "iTerm.app" })).toBe("iterm2");
+  });
+
+  it("detects Warp and falls back to generic", () => {
+    expect(detectTerminalProfileFromEnv({ TERM_PROGRAM: "WarpTerminal" })).toBe("warp");
+    expect(detectTerminalProfileFromEnv({ TERM_PROGRAM: "UnknownTerm" })).toBe("generic");
+  });
+});
+
 describe("parseMonitorOptions", () => {
   it("defaults decay side to left and hides cursor", () => {
     const parsed = parseMonitorOptions({});
     expect(parsed.decaySide).toBe("left");
     expect(parsed.hideCursor).toBe(true);
+    expect(parsed.terminalProfile).toBe("auto");
+    expect(parsed.emojiWidth).toBe("auto");
   });
 
-  it("supports --no-hide-cursor", () => {
-    const parsed = parseMonitorOptions({ hideCursor: false });
+  it("supports --no-hide-cursor and width overrides", () => {
+    const parsed = parseMonitorOptions({ hideCursor: false, emojiWidth: "2" });
     expect(parsed.hideCursor).toBe(false);
+    expect(parsed.emojiWidth).toBe(2);
   });
 
   it("rejects invalid thresholds", () => {
@@ -53,6 +70,23 @@ describe("parseMonitorOptions", () => {
         criticalSeconds: "60",
       }),
     ).toThrow("--critical-seconds must be greater than --warn-seconds");
+  });
+});
+
+describe("resolveRuntimeTerminalConfig", () => {
+  it("uses Warp defaults when auto-detected", () => {
+    const parsed = parseMonitorOptions({});
+    const cfg = resolveRuntimeTerminalConfig(parsed, { TERM_PROGRAM: "WarpTerminal" });
+    expect(cfg.profile).toBe("warp");
+    expect(cfg.drawPrefix).toContain("[2K");
+    expect(cfg.symbolWidth).toBe(2);
+  });
+
+  it("honors explicit terminal profile over env", () => {
+    const parsed = parseMonitorOptions({ terminalProfile: "generic", emojiWidth: "1" });
+    const cfg = resolveRuntimeTerminalConfig(parsed, { TERM_PROGRAM: "WarpTerminal" });
+    expect(cfg.profile).toBe("generic");
+    expect(cfg.symbolWidth).toBe(1);
   });
 });
 

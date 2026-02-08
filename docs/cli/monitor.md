@@ -28,6 +28,12 @@ openclaw monitor --ok-emoji "🦞" --warn-emoji "🟨" --critical-emoji "⬜"
 
 # Legacy direction (bar shrinks from the right)
 openclaw monitor --decay-side right
+
+# Force Warp profile if auto-detect is wrong
+openclaw monitor --terminal-profile warp
+
+# Override emoji width if a terminal renders symbols unexpectedly
+openclaw monitor --emoji-width 1
 ```
 
 ## Options
@@ -42,10 +48,14 @@ openclaw monitor --decay-side right
 - `--refresh-ms <ms>`: redraw interval in milliseconds (default: `250`)
 - `--width <columns|auto>`: fixed width or terminal auto-detect (default: `auto`)
 - `--no-hide-cursor`: keep the cursor visible while monitoring (default behavior hides it)
+- `--terminal-profile <auto|apple-terminal|iterm2|warp|generic>`: terminal-specific rendering profile (default: `auto`)
+- `--emoji-width <auto|1|2>`: override emoji cell width assumption for bar math (default: `auto`)
 
 ## Notes
 
 - The status line is redrawn in place (no scrolling history).
 - Existing bytes at startup are ignored; only new growth counts as activity.
 - Cursor is hidden while running and restored on exit (use `--no-hide-cursor` to disable).
+- `--width auto` tracks terminal width live; resizing applies on the next redraw tick.
+- Warp uses a clear-line redraw strategy to reduce artifacts when symbols change width.
 - If logs rotate or truncate, monitoring continues automatically.
