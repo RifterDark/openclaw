@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   LogGrowthWatcher,
+  detectSystemColorMode,
   detectTerminalProfileFromEnv,
   formatElapsed,
   parseMonitorOptions,
@@ -48,6 +49,35 @@ describe("terminal profile detection", () => {
   });
 });
 
+describe("detectSystemColorMode", () => {
+  it("honors explicit env override", () => {
+    expect(detectSystemColorMode({ env: { OPENCLAW_MONITOR_COLOR_MODE: "light" } })).toBe("light");
+    expect(detectSystemColorMode({ env: { OPENCLAW_COLOR_MODE: "dark" } })).toBe("dark");
+  });
+
+  it("detects macOS dark mode from AppleInterfaceStyle", () => {
+    expect(
+      detectSystemColorMode({
+        env: {},
+        platform: "darwin",
+        readAppleInterfaceStyle: () => "Dark",
+      }),
+    ).toBe("dark");
+    expect(
+      detectSystemColorMode({
+        env: {},
+        platform: "darwin",
+        readAppleInterfaceStyle: () => "",
+      }),
+    ).toBe("light");
+  });
+
+  it("falls back to COLORFGBG heuristics on non-mac platforms", () => {
+    expect(detectSystemColorMode({ env: { COLORFGBG: "15;0" }, platform: "linux" })).toBe("dark");
+    expect(detectSystemColorMode({ env: { COLORFGBG: "0;15" }, platform: "linux" })).toBe("light");
+  });
+});
+
 describe("parseMonitorOptions", () => {
   it("defaults decay side to left and hides cursor", () => {
     const parsed = parseMonitorOptions({});
@@ -56,6 +86,8 @@ describe("parseMonitorOptions", () => {
     expect(parsed.terminalProfile).toBe("auto");
     expect(parsed.emojiWidth).toBe("auto");
     expect(parsed.lobsterStyle).toBe("auto");
+    expect(parsed.colorMode).toBe("auto");
+    expect(["dark", "light"]).toContain(parsed.resolvedColorMode);
   });
 
   it("supports --no-hide-cursor and width overrides", () => {
@@ -63,10 +95,20 @@ describe("parseMonitorOptions", () => {
       hideCursor: false,
       emojiWidth: "2",
       lobsterStyle: "text",
+      colorMode: "light",
     });
     expect(parsed.hideCursor).toBe(false);
     expect(parsed.emojiWidth).toBe(2);
     expect(parsed.lobsterStyle).toBe("text");
+    expect(parsed.colorMode).toBe("light");
+    expect(parsed.resolvedColorMode).toBe("light");
+    expect(parsed.criticalEmoji).toBe("⬛");
+  });
+
+  it("applies dark-mode default critical symbol", () => {
+    const parsed = parseMonitorOptions({ colorMode: "dark" });
+    expect(parsed.criticalEmoji).toBe("⬜");
+    expect(parsed.resolvedColorMode).toBe("dark");
   });
 
   it("rejects invalid thresholds", () => {
@@ -90,14 +132,30 @@ describe("resolveRuntimeTerminalConfig", () => {
   });
 
   it("auto-enables image lobsters for iTerm2", () => {
-    const parsed = parseMonitorOptions({});
+    const parsed = parseMonitorOptions({ colorMode: "dark" });
     const cfg = resolveRuntimeTerminalConfig(parsed, { TERM_PROGRAM: "iTerm.app" });
     expect(cfg.profile).toBe("iterm2");
     expect(cfg.lobsterStyle).toBe("image");
+    expect(cfg.colorMode).toBe("dark");
     expect(cfg.imageSymbols?.ok).toContain("1337;File=");
     expect(cfg.imageSymbols?.warn).toContain("1337;File=");
     expect(cfg.imageSymbols?.critical).toContain("1337;File=");
     expect(cfg.symbolWidth).toBe(2);
+  });
+
+  it("switches critical image between dark and light color modes", () => {
+    const dark = resolveRuntimeTerminalConfig(
+      parseMonitorOptions({ colorMode: "dark", lobsterStyle: "image", terminalProfile: "iterm2" }),
+      { TERM_PROGRAM: "iTerm.app" },
+    );
+    const light = resolveRuntimeTerminalConfig(
+      parseMonitorOptions({ colorMode: "light", lobsterStyle: "image", terminalProfile: "iterm2" }),
+      { TERM_PROGRAM: "iTerm.app" },
+    );
+
+    expect(dark.imageSymbols?.critical).not.toBe(light.imageSymbols?.critical);
+    expect(dark.colorMode).toBe("dark");
+    expect(light.colorMode).toBe("light");
   });
 
   it("falls back to text when image style is requested on unsupported terminals", () => {

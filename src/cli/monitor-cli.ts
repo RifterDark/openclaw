@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { Option, type Command } from "commander";
 import fs from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
@@ -11,6 +12,8 @@ type DrawStrategy = "carriage" | "clear-line";
 type SymbolWidth = number | "auto";
 type LobsterStyleOption = "auto" | "text" | "image";
 type LobsterStyle = Exclude<LobsterStyleOption, "auto">;
+type ColorModeOption = "auto" | "dark" | "light";
+type ColorMode = Exclude<ColorModeOption, "auto">;
 
 type MonitorCliOptions = {
   logs?: string;
@@ -26,6 +29,7 @@ type MonitorCliOptions = {
   terminalProfile?: TerminalProfileOption;
   emojiWidth?: string;
   lobsterStyle?: LobsterStyleOption;
+  colorMode?: ColorModeOption;
 };
 
 type ParsedMonitorOptions = {
@@ -42,6 +46,8 @@ type ParsedMonitorOptions = {
   terminalProfile: TerminalProfileOption;
   emojiWidth: SymbolWidth;
   lobsterStyle: LobsterStyleOption;
+  colorMode: ColorModeOption;
+  resolvedColorMode: ColorMode;
 };
 
 type FileState = {
@@ -56,6 +62,7 @@ type RuntimeTerminalConfig = {
   symbolWidth: SymbolWidth;
   supportsCursorHide: boolean;
   lobsterStyle: LobsterStyle;
+  colorMode: ColorMode;
   imageSymbols: Record<"ok" | "warn" | "critical", string> | null;
 };
 
@@ -76,8 +83,12 @@ const LOBSTER_YELLOW_PNG_B64 =
 const LOBSTER_WHITE_PNG_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAACqklEQVR42oVTz08TQRR+Mzu77VIr7EKrLZAapSEkprEh8dCLciOejKcmeFMb4ebf4cGbeiDxHzAeuHgtMSKyaNKGkkD8xUa7jS3NstNtmd3ZHQ+2pPgjfJeXvJfvm/feNw/gNNAf8V84VZOGkysrKzOFQuEB5/yzZVmdfh4DgMjlcslisbgyPz9vG4bRHHAwAIAQAgAAxsfHH6fT6YeZTKZUKpVkABC/ywLPzc3dT6VS9yYmJp4McwgAIISQyGQyFzHGC4qixGRZvm6aJs7lcjHOOSqXy8cY4zwh5Iosy9Ozs7OXEELfAACTwSzJZBIYY0EkEiGyLDNd12/HYrGrAIBWV1drsixzVVVJq9Xqjo6OnuwB99tEhmE0HMcpW5YFQRAc7O3tvZMkaVkI8ahWq1XCMPxiWRZQSje2tra+9vkhGRIKLMt6LsvynampqbSiKJfz+byGMcaqqs5ks9mUbdtQr9efDRkQSP1thktLS+c1TdM9z/Mwxguc81vZbFaPRCLINM0CQmiaUvoqGo1+mJyc7Ozv77sAgPBglqOjo7EgCG5gjNPNZvO97/sxSZJwEATg+37UsqyPhJALGOObhJDEwP4TgXa7zRlj1Pf9Y0VRzmGMDzjnwBgDAPiuqmrM8zyfMdbpdrt+nyZOBHzfZ5TST5TSt5VKZXlkZORFr9eDXq8HCKGX29vbdx3H2XBdt0oIGQgA6bsAhmHYhmG8XlxcbDHGqOd5puM4wBgDzrmp6zr1PM9YW1t7M/iApzoAgBAAgDHW3t3dpUII1Gq1gsPDQxBChOVyORBC1PsPhvCfo5ESiYRaLBbH4vF41bZtzfM8iMfjHdd1r21ubjY0TWPr6+t8eIRhhM1ms9NoNAKE0FNKaYZzDtFo9MfOzs7ParXqnnGpZ+Iv8i+Mqk4y9g+F5wAAAABJRU5ErkJggg==";
 
+const LOBSTER_BLACK_PNG_B64 =
+  "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAACj0lEQVR42oVTTU9TQRQ9M28er7SFtMCzSkqUlqQsXGCasJCFsjUhMa7d+RFx5z9g78KduvMPGLduAQPGGE0kkRBiKW0QaDGmpdPy5tuFLSl+ns1N7s05c+69c4GzIL/EP+FMzetPLiwsTBUKhXtRFJWazSbv5ikAl8vlzs3NzT0sFAqN7e3tox6HAoBzDgAwMDDwOJFIPMhms/eLxaIPwP0sO5rNZu8mk8k7vu8/6ecwAIQQ4sIwPG+tnfc8L+Gcmw3DkGYymYS1liwtLUXGmCsA8oSQiUwmc4kQsguAsl4v8XgcWmvDfkIopW7m8/nLhBCyurr62fd9HQQB63Q6nSAITudAuzZJpVI5FEIsN5tNEEIq5XL5rXNuUWv9qFQqfSKE7DQaDQgh1qvVarnLt6xPyLTb7eeU0lupVGp8cHAwNzY2lqaU0qGhoal0On2Bc45Wq/WsbwHG607Tzs7ODodhOCKEkADmpZQ3wjAcYYyRer1+lRAyIaV8lUwmPwwPD/ODg4M2AEJ7vRhjUlLKa5TScc75O2ttwvM86pyDtTZ2fHz80fO8jFLqOmMs7K3/VIBzrqWULaVUxBhLUkorxhhorQFgjzGW0Foray2XUqouzZ0KEEKElPKL1nptd3d3MR6Pv1BKQUoJ3/df7uzs3BZCrEspNwD0BMC6W8DW1lYDwOuZmZlvWusWgOrJyUnPQXVycrIlpXy/trb2pvcBzzgAYAFAKfV9b2+v5ZwjnHPTbrdhrbXLy8smiqL97oMWfzkaLwzDwWKxmAqCYKPT6aS11ojFYjyKopnNzc3D6elpsbKyovtb6Ic9OjrijUbDjI6OPhVCXDTGIBaLfd3f36/XarV2rVb716X+F7+RfwB3kk7a6W3MoQAAAABJRU5ErkJggg==";
+
 const TERMINAL_PROFILES = ["auto", "apple-terminal", "iterm2", "warp", "generic"] as const;
 const LOBSTER_STYLES = ["auto", "text", "image"] as const;
+const COLOR_MODES = ["auto", "dark", "light"] as const;
 
 const TERMINAL_DEFAULTS: Record<
   TerminalProfile,
@@ -230,6 +241,70 @@ function parseLobsterStyle(value: string | undefined): LobsterStyleOption {
   throw new Error("--lobster-style must be one of: auto, text, image");
 }
 
+function parseColorMode(value: string | undefined): ColorModeOption {
+  const normalized = String(value ?? "auto")
+    .trim()
+    .toLowerCase();
+  if (COLOR_MODES.includes(normalized as ColorModeOption)) {
+    return normalized as ColorModeOption;
+  }
+  throw new Error("--color-mode must be one of: auto, dark, light");
+}
+
+function parseExplicitColorMode(value: string | undefined): ColorMode | null {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (normalized === "dark" || normalized === "light") {
+    return normalized;
+  }
+  return null;
+}
+
+export function detectSystemColorMode(params?: {
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+  readAppleInterfaceStyle?: () => string | null;
+}): ColorMode {
+  const env = params?.env ?? process.env;
+  const platform = params?.platform ?? process.platform;
+
+  const explicit =
+    parseExplicitColorMode(env.OPENCLAW_MONITOR_COLOR_MODE) ??
+    parseExplicitColorMode(env.OPENCLAW_COLOR_MODE);
+  if (explicit) {
+    return explicit;
+  }
+
+  if (platform === "darwin") {
+    try {
+      const appleInterfaceStyle =
+        params?.readAppleInterfaceStyle?.() ??
+        execFileSync("defaults", ["read", "-g", "AppleInterfaceStyle"], {
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "ignore"],
+        });
+      if (String(appleInterfaceStyle).toLowerCase().includes("dark")) {
+        return "dark";
+      }
+      return "light";
+    } catch {
+      return "light";
+    }
+  }
+
+  const colorfgbg = String(env.COLORFGBG ?? "").trim();
+  if (colorfgbg) {
+    const tail = colorfgbg.split(";").at(-1);
+    const parsed = Number.parseInt(tail ?? "", 10);
+    if (Number.isFinite(parsed)) {
+      return parsed <= 6 ? "dark" : "light";
+    }
+  }
+
+  return "dark";
+}
+
 export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOptions {
   const logs = String(raw.logs ?? "").trim() || "/tmp/openclaw/openclaw-*.log";
   const warnSeconds = parsePositiveNumber(raw.warnSeconds ?? "60", "--warn-seconds");
@@ -240,6 +315,8 @@ export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOption
   const terminalProfile = parseTerminalProfile(raw.terminalProfile ?? "auto");
   const emojiWidth = parseSymbolWidth(raw.emojiWidth ?? "auto");
   const lobsterStyle = parseLobsterStyle(raw.lobsterStyle ?? "auto");
+  const colorMode = parseColorMode(raw.colorMode ?? "auto");
+  const resolvedColorMode = colorMode === "auto" ? detectSystemColorMode() : colorMode;
 
   if (criticalSeconds <= warnSeconds) {
     throw new Error("--critical-seconds must be greater than --warn-seconds");
@@ -247,7 +324,7 @@ export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOption
 
   const okEmoji = raw.okEmoji ?? "🦞";
   const warnEmoji = raw.warnEmoji ?? "🟨";
-  const criticalEmoji = raw.criticalEmoji ?? "⬜";
+  const criticalEmoji = raw.criticalEmoji ?? (resolvedColorMode === "dark" ? "⬜" : "⬛");
 
   if (!okEmoji) {
     throw new Error("--ok-emoji cannot be empty");
@@ -273,6 +350,8 @@ export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOption
     terminalProfile,
     emojiWidth,
     lobsterStyle,
+    colorMode,
+    resolvedColorMode,
   };
 }
 
@@ -302,18 +381,22 @@ function buildIterm2InlineImageSequence(
   return `\u001b]1337;File=name=${nameB64};width=${widthCells};height=${heightCells};inline=1;preserveAspectRatio=1:${pngBase64}\u0007`;
 }
 
-function buildIterm2LobsterSymbols(): Record<"ok" | "warn" | "critical", string> {
+function buildIterm2LobsterSymbols(colorMode: ColorMode): Record<"ok" | "warn" | "critical", string> {
   return {
     ok: buildIterm2InlineImageSequence(LOBSTER_RED_PNG_B64, { name: "lobster-ok" }),
     warn: buildIterm2InlineImageSequence(LOBSTER_YELLOW_PNG_B64, { name: "lobster-warn" }),
-    critical: buildIterm2InlineImageSequence(LOBSTER_WHITE_PNG_B64, {
-      name: "lobster-critical",
-    }),
+    critical: buildIterm2InlineImageSequence(
+      colorMode === "dark" ? LOBSTER_WHITE_PNG_B64 : LOBSTER_BLACK_PNG_B64,
+      { name: "lobster-critical" },
+    ),
   };
 }
 
 export function resolveRuntimeTerminalConfig(
-  options: Pick<ParsedMonitorOptions, "terminalProfile" | "emojiWidth" | "lobsterStyle">,
+  options: Pick<
+    ParsedMonitorOptions,
+    "terminalProfile" | "emojiWidth" | "lobsterStyle" | "colorMode" | "resolvedColorMode"
+  >,
   env: NodeJS.ProcessEnv = process.env,
 ): RuntimeTerminalConfig {
   const profile =
@@ -333,6 +416,9 @@ export function resolveRuntimeTerminalConfig(
         ? "text"
         : options.lobsterStyle;
 
+  const effectiveColorMode: ColorMode =
+    options.colorMode === "auto" ? options.resolvedColorMode : options.colorMode;
+
   const symbolWidth: SymbolWidth =
     effectiveLobsterStyle === "image"
       ? options.emojiWidth === "auto"
@@ -348,7 +434,8 @@ export function resolveRuntimeTerminalConfig(
     symbolWidth,
     supportsCursorHide: defaults.supportsCursorHide,
     lobsterStyle: effectiveLobsterStyle,
-    imageSymbols: effectiveLobsterStyle === "image" ? buildIterm2LobsterSymbols() : null,
+    colorMode: effectiveColorMode,
+    imageSymbols: effectiveLobsterStyle === "image" ? buildIterm2LobsterSymbols(effectiveColorMode) : null,
   };
 }
 
@@ -623,8 +710,8 @@ export function registerMonitorCli(program: Command) {
     .option("--warn-seconds <seconds>", "Idle seconds before warning state", "60")
     .option("--critical-seconds <seconds>", "Idle seconds before critical state", "120")
     .option("--ok-emoji <emoji>", "Emoji shown while logs are fresh", "🦞")
-    .option("--warn-emoji <emoji>", "Emoji shown between warning and critical", "🟨")
-    .option("--critical-emoji <emoji>", "Emoji shown for full-width critical bar", "⬜")
+    .option("--warn-emoji <emoji>", "Emoji shown between warning and critical")
+    .option("--critical-emoji <emoji>", "Emoji shown for full-width critical bar")
     .addOption(
       new Option("--decay-side <side>", "Which side empties as idle grows: left (default) or right")
         .choices(["left", "right"])
@@ -639,6 +726,14 @@ export function registerMonitorCli(program: Command) {
         "Terminal profile: auto-detect, or force apple-terminal/iterm2/warp/generic",
       )
         .choices(["auto", "apple-terminal", "iterm2", "warp", "generic"])
+        .default("auto"),
+    )
+    .addOption(
+      new Option(
+        "--color-mode <mode>",
+        "Color mode: auto-detect from system appearance, or force dark/light",
+      )
+        .choices(["auto", "dark", "light"])
         .default("auto"),
     )
     .option(

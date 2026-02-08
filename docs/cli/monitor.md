@@ -23,6 +23,9 @@ openclaw monitor
 # Tune thresholds
 openclaw monitor --warn-seconds 45 --critical-seconds 90
 
+# Force light-mode palette
+openclaw monitor --color-mode light
+
 # Override visuals
 openclaw monitor --ok-emoji "🦞" --warn-emoji "🟨" --critical-emoji "⬜"
 
@@ -46,12 +49,13 @@ openclaw monitor --lobster-style image --terminal-profile iterm2
 - `--critical-seconds <seconds>`: critical threshold for idle time (default: `120`)
 - `--ok-emoji <emoji>`: healthy-state symbol (default: `🦞`)
 - `--warn-emoji <emoji>`: warning-state symbol (default: `🟨`)
-- `--critical-emoji <emoji>`: critical full-width bar symbol (default: `⬜`)
+- `--critical-emoji <emoji>`: critical full-width bar symbol (defaults by mode: dark=`⬜`, light=`⬛`)
 - `--decay-side <left|right>`: which side empties during decay (default: `left`)
 - `--refresh-ms <ms>`: redraw interval in milliseconds (default: `250`)
 - `--width <columns|auto>`: fixed width or terminal auto-detect (default: `auto`)
 - `--no-hide-cursor`: keep the cursor visible while monitoring (default behavior hides it)
 - `--terminal-profile <auto|apple-terminal|iterm2|warp|generic>`: terminal-specific rendering profile (default: `auto`)
+- `--color-mode <auto|dark|light>`: pick dark/light palette or auto-detect from system appearance (default: `auto`)
 - `--emoji-width <auto|1|2>`: override emoji cell width assumption for bar math (default: `auto`)
 - `--lobster-style <auto|text|image>`: choose text symbols or iTerm2 inline images (default: `auto`)
 
@@ -63,6 +67,6 @@ openclaw monitor --lobster-style image --terminal-profile iterm2
 - `--width auto` tracks terminal width live; resizing applies on the next redraw tick.
 - Warp uses a clear-line redraw strategy to reduce artifacts when symbols change width.
 - On Warp text mode, the default critical `⬜` is replaced with a solid `██` fallback to avoid hollow-square glyph rendering.
-- `--lobster-style image` uses embedded lobster PNGs for all states (derived from the macOS lobster glyph), with a frozen red OK lobster plus yellow/white warning/critical tones matched to `🟨` and `⬜`, via iTerm2's inline image protocol.
+- `--lobster-style image` uses embedded lobster PNGs for all states (derived from the macOS lobster glyph), with a frozen red OK lobster; warning stays yellow, and critical switches white (dark mode) or black (light mode), via iTerm2's inline image protocol.
 - If image mode is requested on non-iTerm2 terminals, monitor falls back to text symbols.
 - If logs rotate or truncate, monitoring continues automatically.
