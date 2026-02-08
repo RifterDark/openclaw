@@ -240,6 +240,36 @@ export const OpenClawSchema = z
           })
           .strict()
           .optional(),
+        monitor: z
+          .object({
+            logs: z.string().optional(),
+            warnSeconds: z.number().positive().optional(),
+            criticalSeconds: z.number().positive().optional(),
+            okEmoji: z.string().min(1).optional(),
+            warnEmoji: z.string().min(1).optional(),
+            criticalEmoji: z.string().min(1).optional(),
+            decaySide: z.union([z.literal("left"), z.literal("right")]).optional(),
+            refreshMs: z.number().int().positive().optional(),
+            width: z.union([z.literal("auto"), z.number().int().positive()]).optional(),
+            hideCursor: z.boolean().optional(),
+            clearOnEvents: z.boolean().optional(),
+            terminalProfile: z
+              .union([
+                z.literal("auto"),
+                z.literal("apple-terminal"),
+                z.literal("iterm2"),
+                z.literal("warp"),
+                z.literal("generic"),
+              ])
+              .optional(),
+            emojiWidth: z.union([z.literal("auto"), z.literal(1), z.literal(2)]).optional(),
+            lobsterStyle: z
+              .union([z.literal("auto"), z.literal("text"), z.literal("image")])
+              .optional(),
+            colorMode: z.union([z.literal("auto"), z.literal("dark"), z.literal("light")]).optional(),
+          })
+          .strict()
+          .optional(),
       })
       .strict()
       .optional(),

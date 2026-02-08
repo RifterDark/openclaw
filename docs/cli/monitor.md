@@ -63,6 +63,39 @@ openclaw monitor --lobster-style image --terminal-profile iterm2
 - `--emoji-width <auto|1|2>`: override emoji cell width assumption for bar math (default: `auto`)
 - `--lobster-style <auto|text|image>`: choose text symbols or iTerm2 inline images (default: `auto`, which uses text)
 
+## Precedence (modeled after other OpenClaw commands)
+
+`openclaw monitor` resolves settings in this order:
+
+1. CLI flags (highest)
+2. Environment variables (`OPENCLAW_MONITOR_*`)
+3. `~/.openclaw/openclaw.json` (`ui.monitor`)
+4. Built-in defaults
+
+Example config:
+
+```json5
+{
+  ui: {
+    monitor: {
+      warnSeconds: 45,
+      criticalSeconds: 90,
+      colorMode: "auto",
+      clearOnEvents: true,
+    },
+  },
+}
+```
+
+Common env vars:
+
+- `OPENCLAW_MONITOR_LOGS`
+- `OPENCLAW_MONITOR_WARN_SECONDS`
+- `OPENCLAW_MONITOR_CRITICAL_SECONDS`
+- `OPENCLAW_MONITOR_COLOR_MODE`
+- `OPENCLAW_MONITOR_CLEAR_ON_EVENTS`
+- `OPENCLAW_MONITOR_HIDE_CURSOR`
+
 ## Notes
 
 - The status line is redrawn in place (no scrolling history).

@@ -114,6 +114,106 @@ describe("parseMonitorOptions", () => {
     expect(parsed.clearOnEvents).toBe(false);
   });
 
+  it("applies env + config fallback when options were not explicitly provided", () => {
+    const parsed = parseMonitorOptions(
+      {
+        warnSeconds: "60",
+        colorMode: "auto",
+        clearOnEvents: true,
+      },
+      {
+        env: {
+          OPENCLAW_MONITOR_WARN_SECONDS: "75",
+          OPENCLAW_MONITOR_COLOR_MODE: "light",
+          OPENCLAW_MONITOR_CLEAR_ON_EVENTS: "false",
+        },
+        config: {
+          ui: {
+            monitor: {
+              warnSeconds: 90,
+              colorMode: "dark",
+              clearOnEvents: true,
+            },
+          },
+        },
+        optionSources: {
+          warnSeconds: "default",
+          colorMode: "default",
+          clearOnEvents: "default",
+        },
+      },
+    );
+
+    expect(parsed.warnSeconds).toBe(75);
+    expect(parsed.colorMode).toBe("light");
+    expect(parsed.resolvedColorMode).toBe("light");
+    expect(parsed.clearOnEvents).toBe(false);
+  });
+
+  it("applies config fallback when env and CLI are missing", () => {
+    const parsed = parseMonitorOptions(
+      {
+        warnSeconds: "60",
+        decaySide: "left",
+        width: "auto",
+      },
+      {
+        env: {},
+        config: {
+          ui: {
+            monitor: {
+              warnSeconds: 33,
+              decaySide: "right",
+              width: 88,
+              colorMode: "dark",
+            },
+          },
+        },
+        optionSources: {
+          warnSeconds: "default",
+          decaySide: "default",
+          width: "default",
+          colorMode: "default",
+        },
+      },
+    );
+
+    expect(parsed.warnSeconds).toBe(33);
+    expect(parsed.decaySide).toBe("right");
+    expect(parsed.width).toBe(88);
+    expect(parsed.colorMode).toBe("dark");
+  });
+
+  it("keeps CLI values above env + config when explicitly set", () => {
+    const parsed = parseMonitorOptions(
+      {
+        warnSeconds: "45",
+        colorMode: "light",
+      },
+      {
+        env: {
+          OPENCLAW_MONITOR_WARN_SECONDS: "75",
+          OPENCLAW_MONITOR_COLOR_MODE: "dark",
+        },
+        config: {
+          ui: {
+            monitor: {
+              warnSeconds: 90,
+              colorMode: "dark",
+            },
+          },
+        },
+        optionSources: {
+          warnSeconds: "cli",
+          colorMode: "cli",
+        },
+      },
+    );
+
+    expect(parsed.warnSeconds).toBe(45);
+    expect(parsed.colorMode).toBe("light");
+  });
+
   it("applies dark-mode default warning/critical symbols", () => {
     const parsed = parseMonitorOptions({ colorMode: "dark" });
     expect(parsed.warnEmoji).toBe("🟨");

@@ -74,6 +74,38 @@ export type OpenClawConfig = {
       /** Assistant avatar (emoji, short text, or image URL/data URI). */
       avatar?: string;
     };
+    monitor?: {
+      /** Glob pattern for monitored log files. */
+      logs?: string;
+      /** Idle seconds before warning state. */
+      warnSeconds?: number;
+      /** Idle seconds before critical state. */
+      criticalSeconds?: number;
+      /** Symbol shown while logs are fresh. */
+      okEmoji?: string;
+      /** Symbol shown between warning and critical. */
+      warnEmoji?: string;
+      /** Symbol shown when critical threshold is reached. */
+      criticalEmoji?: string;
+      /** Which side empties as idle grows. */
+      decaySide?: "left" | "right";
+      /** Redraw interval in milliseconds. */
+      refreshMs?: number;
+      /** Monitor width in columns or auto. */
+      width?: number | "auto";
+      /** Hide cursor while monitoring. */
+      hideCursor?: boolean;
+      /** Clear-to-start redraw on resize/Enter events. */
+      clearOnEvents?: boolean;
+      /** Terminal profile strategy. */
+      terminalProfile?: "auto" | "apple-terminal" | "iterm2" | "warp" | "generic";
+      /** Emoji width override. */
+      emojiWidth?: "auto" | 1 | 2;
+      /** Symbol rendering style for lobster mode. */
+      lobsterStyle?: "auto" | "text" | "image";
+      /** Color mode selection. */
+      colorMode?: "auto" | "dark" | "light";
+    };
   };
   skills?: SkillsConfig;
   plugins?: PluginsConfig;

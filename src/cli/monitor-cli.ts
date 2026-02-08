@@ -2,8 +2,10 @@ import { execFileSync } from "node:child_process";
 import { Option, type Command } from "commander";
 import fs from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
+import { loadConfig, type OpenClawConfig } from "../config/config.js";
 import { formatDocsLink } from "../terminal/links.js";
 import { theme } from "../terminal/theme.js";
+import { parseBooleanValue } from "../utils/boolean.js";
 
 type DecaySide = "left" | "right";
 type TerminalProfileOption = "auto" | "apple-terminal" | "iterm2" | "warp" | "generic";
@@ -53,6 +55,15 @@ type ParsedMonitorOptions = {
   resolvedColorMode: ColorMode;
 };
 
+type MonitorOptionSource = "default" | "config" | "env" | "cli" | "implied" | string;
+type MonitorOptionSources = Partial<Record<keyof MonitorCliOptions, MonitorOptionSource | undefined>>;
+type MonitorConfigValues = NonNullable<NonNullable<OpenClawConfig["ui"]>["monitor"]>;
+type ParseMonitorOptionsContext = {
+  env?: NodeJS.ProcessEnv;
+  config?: OpenClawConfig;
+  optionSources?: MonitorOptionSources;
+};
+
 type FileState = {
   dev: number;
   ino: number;
@@ -96,6 +107,24 @@ const LOBSTER_BLACK_PNG_B64 =
 const TERMINAL_PROFILES = ["auto", "apple-terminal", "iterm2", "warp", "generic"] as const;
 const LOBSTER_STYLES = ["auto", "text", "image"] as const;
 const COLOR_MODES = ["auto", "dark", "light"] as const;
+const MONITOR_OPTION_SOURCE_KEYS: (keyof MonitorCliOptions)[] = [
+  "logs",
+  "warnSeconds",
+  "criticalSeconds",
+  "okEmoji",
+  "warnEmoji",
+  "criticalEmoji",
+  "decaySide",
+  "refreshMs",
+  "width",
+  "hideCursor",
+  "clearOnEvents",
+  "clear",
+  "terminalProfile",
+  "emojiWidth",
+  "lobsterStyle",
+  "colorMode",
+];
 
 const TERMINAL_DEFAULTS: Record<
   TerminalProfile,
@@ -312,26 +341,168 @@ export function detectSystemColorMode(params?: {
   return "dark";
 }
 
-export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOptions {
-  const logs = String(raw.logs ?? "").trim() || "/tmp/openclaw/openclaw-*.log";
-  const warnSeconds = parsePositiveNumber(raw.warnSeconds ?? "60", "--warn-seconds");
-  const criticalSeconds = parsePositiveNumber(raw.criticalSeconds ?? "120", "--critical-seconds");
-  const refreshMs = parsePositiveInteger(raw.refreshMs ?? "250", "--refresh-ms");
-  const width = parseWidth(raw.width ?? "auto");
-  const decaySide = raw.decaySide === "right" ? "right" : "left";
-  const terminalProfile = parseTerminalProfile(raw.terminalProfile ?? "auto");
-  const emojiWidth = parseSymbolWidth(raw.emojiWidth ?? "auto");
-  const lobsterStyle = parseLobsterStyle(raw.lobsterStyle ?? "auto");
-  const colorMode = parseColorMode(raw.colorMode ?? "auto");
-  const resolvedColorMode = colorMode === "auto" ? detectSystemColorMode() : colorMode;
+function parseDecaySide(value: string | undefined): DecaySide {
+  const normalized = String(value ?? "left")
+    .trim()
+    .toLowerCase();
+  if (normalized === "left" || normalized === "right") {
+    return normalized;
+  }
+  throw new Error("--decay-side must be one of: left, right");
+}
+
+function firstNonEmptyEnv(env: NodeJS.ProcessEnv, keys: readonly string[]): string | undefined {
+  for (const key of keys) {
+    const value = env[key];
+    if (typeof value !== "string") {
+      continue;
+    }
+    const trimmed = value.trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+  return undefined;
+}
+
+function firstBooleanEnv(env: NodeJS.ProcessEnv, keys: readonly string[]): boolean | undefined {
+  for (const key of keys) {
+    const parsed = parseBooleanValue(env[key]);
+    if (parsed !== undefined) {
+      return parsed;
+    }
+  }
+  return undefined;
+}
+
+function isOptionExplicit(
+  raw: MonitorCliOptions,
+  names: readonly (keyof MonitorCliOptions)[],
+  optionSources?: MonitorOptionSources,
+): boolean {
+  if (optionSources) {
+    return names.some((name) => optionSources[name] === "cli");
+  }
+  return names.some((name) => raw[name] !== undefined);
+}
+
+function toOptionString(value: unknown): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return String(value);
+}
+
+function collectMonitorOptionSources(command: Command): MonitorOptionSources | undefined {
+  if (typeof command.getOptionValueSource !== "function") {
+    return undefined;
+  }
+  const sources: MonitorOptionSources = {};
+  for (const key of MONITOR_OPTION_SOURCE_KEYS) {
+    sources[key] = command.getOptionValueSource(key);
+  }
+  return sources;
+}
+
+export function parseMonitorOptions(
+  raw: MonitorCliOptions,
+  context: ParseMonitorOptionsContext = {},
+): ParsedMonitorOptions {
+  const env = context.env ?? process.env;
+  const monitorConfig: MonitorConfigValues | undefined = context.config?.ui?.monitor;
+  const optionSources = context.optionSources;
+
+  const logsInput = isOptionExplicit(raw, ["logs"], optionSources)
+    ? raw.logs
+    : firstNonEmptyEnv(env, ["OPENCLAW_MONITOR_LOGS"]) ?? monitorConfig?.logs;
+
+  const warnSecondsInput = isOptionExplicit(raw, ["warnSeconds"], optionSources)
+    ? raw.warnSeconds
+    : firstNonEmptyEnv(env, ["OPENCLAW_MONITOR_WARN_SECONDS"]) ?? monitorConfig?.warnSeconds;
+
+  const criticalSecondsInput = isOptionExplicit(raw, ["criticalSeconds"], optionSources)
+    ? raw.criticalSeconds
+    : firstNonEmptyEnv(env, ["OPENCLAW_MONITOR_CRITICAL_SECONDS"]) ??
+      monitorConfig?.criticalSeconds;
+
+  const refreshMsInput = isOptionExplicit(raw, ["refreshMs"], optionSources)
+    ? raw.refreshMs
+    : firstNonEmptyEnv(env, ["OPENCLAW_MONITOR_REFRESH_MS"]) ?? monitorConfig?.refreshMs;
+
+  const widthInput = isOptionExplicit(raw, ["width"], optionSources)
+    ? raw.width
+    : firstNonEmptyEnv(env, ["OPENCLAW_MONITOR_WIDTH"]) ?? monitorConfig?.width;
+
+  const decaySideInput = isOptionExplicit(raw, ["decaySide"], optionSources)
+    ? raw.decaySide
+    : firstNonEmptyEnv(env, ["OPENCLAW_MONITOR_DECAY_SIDE"]) ?? monitorConfig?.decaySide;
+
+  const terminalProfileInput = isOptionExplicit(raw, ["terminalProfile"], optionSources)
+    ? raw.terminalProfile
+    : firstNonEmptyEnv(env, ["OPENCLAW_MONITOR_TERMINAL_PROFILE"]) ??
+      monitorConfig?.terminalProfile;
+
+  const emojiWidthInput = isOptionExplicit(raw, ["emojiWidth"], optionSources)
+    ? raw.emojiWidth
+    : firstNonEmptyEnv(env, ["OPENCLAW_MONITOR_EMOJI_WIDTH"]) ?? monitorConfig?.emojiWidth;
+
+  const lobsterStyleInput = isOptionExplicit(raw, ["lobsterStyle"], optionSources)
+    ? raw.lobsterStyle
+    : firstNonEmptyEnv(env, ["OPENCLAW_MONITOR_LOBSTER_STYLE"]) ?? monitorConfig?.lobsterStyle;
+
+  const colorModeInput = isOptionExplicit(raw, ["colorMode"], optionSources)
+    ? raw.colorMode
+    : firstNonEmptyEnv(env, ["OPENCLAW_MONITOR_COLOR_MODE", "OPENCLAW_COLOR_MODE"]) ??
+      monitorConfig?.colorMode;
+
+  const hideCursorInput = isOptionExplicit(raw, ["hideCursor"], optionSources)
+    ? raw.hideCursor
+    : firstBooleanEnv(env, ["OPENCLAW_MONITOR_HIDE_CURSOR"]) ?? monitorConfig?.hideCursor;
+
+  const clearOnEventsInput = isOptionExplicit(raw, ["clearOnEvents", "clear"], optionSources)
+    ? raw.clearOnEvents !== false && raw.clear !== false
+    : firstBooleanEnv(env, ["OPENCLAW_MONITOR_CLEAR_ON_EVENTS", "OPENCLAW_MONITOR_CLEAR"]) ??
+      monitorConfig?.clearOnEvents;
+
+  const okEmojiInput = isOptionExplicit(raw, ["okEmoji"], optionSources)
+    ? raw.okEmoji
+    : firstNonEmptyEnv(env, ["OPENCLAW_MONITOR_OK_EMOJI"]) ?? monitorConfig?.okEmoji;
+
+  const warnEmojiInput = isOptionExplicit(raw, ["warnEmoji"], optionSources)
+    ? raw.warnEmoji
+    : firstNonEmptyEnv(env, ["OPENCLAW_MONITOR_WARN_EMOJI"]) ?? monitorConfig?.warnEmoji;
+
+  const criticalEmojiInput = isOptionExplicit(raw, ["criticalEmoji"], optionSources)
+    ? raw.criticalEmoji
+    : firstNonEmptyEnv(env, ["OPENCLAW_MONITOR_CRITICAL_EMOJI"]) ??
+      monitorConfig?.criticalEmoji;
+
+  const logs = String(toOptionString(logsInput) ?? "").trim() || "/tmp/openclaw/openclaw-*.log";
+  const warnSeconds = parsePositiveNumber(toOptionString(warnSecondsInput) ?? "60", "--warn-seconds");
+  const criticalSeconds = parsePositiveNumber(
+    toOptionString(criticalSecondsInput) ?? "120",
+    "--critical-seconds",
+  );
+  const refreshMs = parsePositiveInteger(toOptionString(refreshMsInput) ?? "250", "--refresh-ms");
+  const width = parseWidth(toOptionString(widthInput) ?? "auto");
+  const decaySide = parseDecaySide(toOptionString(decaySideInput) ?? "left");
+  const terminalProfile = parseTerminalProfile(toOptionString(terminalProfileInput) ?? "auto");
+  const emojiWidth = parseSymbolWidth(toOptionString(emojiWidthInput) ?? "auto");
+  const lobsterStyle = parseLobsterStyle(toOptionString(lobsterStyleInput) ?? "auto");
+  const colorMode = parseColorMode(toOptionString(colorModeInput) ?? "auto");
+  const resolvedColorMode = colorMode === "auto" ? detectSystemColorMode({ env }) : colorMode;
 
   if (criticalSeconds <= warnSeconds) {
     throw new Error("--critical-seconds must be greater than --warn-seconds");
   }
 
-  const okEmoji = raw.okEmoji ?? "🦞";
-  const warnEmoji = raw.warnEmoji ?? (resolvedColorMode === "dark" ? "🟨" : "🟧");
-  const criticalEmoji = raw.criticalEmoji ?? (resolvedColorMode === "dark" ? "⬜" : "⬛");
+  const okEmoji = toOptionString(okEmojiInput) ?? "🦞";
+  const warnEmoji = toOptionString(warnEmojiInput) ?? (resolvedColorMode === "dark" ? "🟨" : "🟧");
+  const criticalEmoji =
+    toOptionString(criticalEmojiInput) ?? (resolvedColorMode === "dark" ? "⬜" : "⬛");
 
   if (!okEmoji) {
     throw new Error("--ok-emoji cannot be empty");
@@ -353,8 +524,8 @@ export function parseMonitorOptions(raw: MonitorCliOptions): ParsedMonitorOption
     decaySide,
     refreshMs,
     width,
-    hideCursor: raw.hideCursor !== false,
-    clearOnEvents: raw.clearOnEvents !== false && raw.clear !== false,
+    hideCursor: hideCursorInput ?? true,
+    clearOnEvents: clearOnEventsInput ?? true,
     terminalProfile,
     emojiWidth,
     lobsterStyle,
@@ -807,8 +978,12 @@ export function registerMonitorCli(program: Command) {
       () =>
         `\n${theme.muted("Docs:")} ${formatDocsLink("/cli/monitor", "docs.openclaw.ai/cli/monitor")}\n`,
     )
-    .action(async (raw: MonitorCliOptions) => {
-      const options = parseMonitorOptions(raw);
+    .action(async (raw: MonitorCliOptions, command: Command) => {
+      const options = parseMonitorOptions(raw, {
+        env: process.env,
+        config: loadConfig(),
+        optionSources: collectMonitorOptionSources(command),
+      });
       await runMonitorCommand(options);
     });
 }
